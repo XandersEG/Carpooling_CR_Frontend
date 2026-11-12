@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Tuanis Carpooling",
+    "slug": "carpooling-cr-frontend",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "tuanis",
+    "userInterfaceStyle": "light",
+    "web": { "bundler": "metro", "output": "single" },
+    "plugins": ["expo-router"]
+  }
+}
