@@ -1,21 +1,11 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
-import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { PrimaryButton } from '@/components/PrimaryButton';
-import { TextField } from '@/components/TextField';
-import { colors, fonts } from '@/src/constants/theme';
+import { FormField } from '@/components/mobile/Form';
+import { AuthButton, AuthLink } from '@/components/mobile/passenger/Auth';
+import { authColors, colors, fonts, typography } from '@/src/constants/theme';
 import { login } from '@/src/services/authService';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -41,10 +31,10 @@ function validate(email: string, password: string): FormErrors {
   return errors;
 }
 
+/** "Inicio de sesión" (Figma 2081:3), reestilizado con los tokens de Punto 4–7 (D1/D2). */
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -61,8 +51,8 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login({ email: email.trim(), password });
-      // TODO: guardar la sesión y navegar a la pantalla principal
-      // cuando el contrato de autenticación esté definido con Backend.
+      // TODO: guardar la sesión cuando el contrato de autenticación esté definido con Backend.
+      router.replace('/inicio');
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'No se pudo iniciar sesión.');
     } finally {
@@ -72,10 +62,7 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
@@ -90,12 +77,14 @@ export default function LoginScreen() {
             />
 
             <View style={styles.header}>
-              <Text style={styles.title}>Bienvenido de nuevo</Text>
+              <Text accessibilityRole="header" style={styles.title}>
+                Bienvenido de nuevo
+              </Text>
               <Text style={styles.subtitle}>Inicia sesión para continuar tu viaje.</Text>
             </View>
 
             <View style={styles.form}>
-              <TextField
+              <FormField
                 label="Correo electrónico"
                 placeholder="nombre@correo.com"
                 value={email}
@@ -108,48 +97,31 @@ export default function LoginScreen() {
                 textContentType="emailAddress"
                 returnKeyType="next"
               />
-
-              <TextField
+              <FormField
                 label="Contraseña"
                 placeholder="Tu contraseña"
                 value={password}
                 onChangeText={setPassword}
                 error={errors.password}
-                secureTextEntry={!showPassword}
+                password
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoComplete="password"
                 textContentType="password"
                 returnKeyType="done"
                 onSubmitEditing={handleLogin}
-                rightElement={
-                  <Pressable
-                    onPress={() => setShowPassword((current) => !current)}
-                    accessibilityRole="button"
-                    accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                    style={styles.eyeButton}
-                  >
-                    <Ionicons
-                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                      size={20}
-                      color={colors.textMuted}
-                    />
-                  </Pressable>
-                }
               />
             </View>
 
             {formError ? <Text style={styles.formError}>{formError}</Text> : null}
 
             <View style={styles.submit}>
-              <PrimaryButton title="Iniciar sesión" onPress={handleLogin} loading={loading} />
+              <AuthButton title="Iniciar sesión" onPress={handleLogin} loading={loading} />
             </View>
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>¿No tienes cuenta?</Text>
-              <Link href="/register" style={styles.link}>
-                Regístrate
-              </Link>
+              <AuthLink label="Regístrate" onPress={() => router.push('/registro')} />
             </View>
           </View>
         </ScrollView>
@@ -164,7 +136,7 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: authColors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -189,34 +161,25 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontFamily: fonts.semiBold,
-    fontSize: 28,
-    lineHeight: 32,
-    letterSpacing: -0.5,
-    color: colors.text,
+    ...typography.screenTitle,
+    textAlign: 'center',
+    color: colors.textTitle,
   },
   subtitle: {
-    fontFamily: fonts.regular,
+    fontFamily: fonts.cairoRegular,
     fontSize: 16,
     lineHeight: 24,
     textAlign: 'center',
-    color: colors.textMuted,
+    color: colors.textSubtitle,
   },
   form: {
     marginTop: 32,
     gap: 20,
   },
-  eyeButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   formError: {
     marginTop: 16,
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    color: colors.error,
+    ...typography.textSecondary,
+    color: authColors.error,
   },
   submit: {
     marginTop: 28,
@@ -224,22 +187,15 @@ const styles = StyleSheet.create({
   footer: {
     marginTop: 'auto',
     paddingTop: 24,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
   footerText: {
-    fontFamily: fonts.regular,
+    fontFamily: fonts.cairoRegular,
     fontSize: 15,
-    color: colors.textMuted,
-  },
-  link: {
-    paddingVertical: 12,
-    fontFamily: fonts.semiBold,
-    fontSize: 15,
-    color: colors.text,
-    textDecorationLine: 'underline',
-    textDecorationColor: colors.accent,
+    color: colors.textPlaceholder,
   },
 });

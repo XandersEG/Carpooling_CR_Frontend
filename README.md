@@ -78,20 +78,24 @@ La ejecución web requiere que el proyecto tenga configuradas las dependencias c
 
 ## Organización del código
 
-La estructura del proyecto se definirá durante la configuración inicial. Se recomienda mantener una organización modular que facilite el trabajo colaborativo.
-
-Estructura propuesta:
+La aplicación móvil y el portal web administrativo comparten una misma base de código con Expo Router. Las páginas de cada plataforma están separadas en grupos de rutas (las carpetas entre paréntesis no aparecen en la URL):
 
 ```text
 Carpooling_CR_Frontend/
-├── app/                  # Pantallas y navegación
+├── app/                  # Rutas (Expo Router)
+│   ├── (mobile)/         # Páginas de la app móvil (/login, ...)
+│   └── (web)/admin/      # Páginas del portal web administrativo (/admin/...)
 ├── assets/               # Imágenes, iconos y fuentes
 ├── components/           # Componentes reutilizables
+│   ├── shared/           # Usados en ambas plataformas
+│   ├── mobile/           # Solo app móvil
+│   └── web/              # Solo portal web
+├── docs/design/          # Análisis del diseño de Figma y plan de implementación
 ├── src/
 │   ├── features/         # Funcionalidades del sistema
-│   ├── services/         # Servicios y comunicación con API
+│   ├── services/         # Servicios y comunicación con API (por ahora simulados en services/mock)
 │   ├── hooks/            # Hooks reutilizables
-│   ├── constants/        # Constantes generales
+│   ├── constants/        # Constantes generales y tokens de diseño (theme.ts)
 │   └── types/            # Tipos e interfaces TypeScript
 ├── .env.example          # Ejemplo de variables de entorno
 ├── .nvmrc                # Versión de Node.js
