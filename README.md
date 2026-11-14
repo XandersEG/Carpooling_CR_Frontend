@@ -118,13 +118,13 @@ Esta estructura puede ajustarse conforme avance el desarrollo, manteniendo la se
 
 El repositorio utiliza un flujo de trabajo basado en ramas y Pull Requests para mantener la estabilidad de `main` y facilitar la integración del trabajo de los colaboradores.
 
-**### Rama principal**
+### **Rama principal**
 
 `main` es la rama principal del proyecto y contiene el código integrado y estable.
 
 **No se permite realizar cambios directamente sobre `main`.**
 
-**### Creación de ramas**
+### **Creación de ramas**
 
 Cada nueva funcionalidad o corrección debe desarrollarse en una rama independiente, creada a partir de la versión más reciente de `main`.
 
@@ -154,7 +154,7 @@ feature/perfil-usuario
 fix/validacion-formulario
 ```
 
-**### Commits**
+### **Commits**
 
 Los cambios deben guardarse mediante commits descriptivos y relacionados con la tarea implementada.
 
@@ -171,14 +171,14 @@ Ejemplos de mensajes:
 - `docs: update frontend README`
 - `refactor: organize user components`
 
-**### Publicar los cambios**
+### **Publicar los cambios**
 
 Después de realizar uno o varios commits:
 
 1. Presionar `Publish branch` para publicar la rama por primera vez.
 2. En los siguientes cambios, utilizar la opción `Push origin` para enviar los commits al repositorio remoto.
 
-**### Actualización antes de crear un Pull Request**
+### **Actualización antes de crear un Pull Request**
 
 Antes de abrir un Pull Request, comprobar que la rama de trabajo esté actualizada con los cambios más recientes de `main`.
 
@@ -186,7 +186,7 @@ Antes de abrir un Pull Request, comprobar que la rama de trabajo esté actualiza
 2. Si `main` recibió nuevos cambios después de crear la rama de trabajo, actualizar la rama actual utilizando la opción `Update from main`, cuando esté disponible.
 3. Resolver los conflictos que puedan aparecer y comprobar que la funcionalidad continúe funcionando correctamente.
 
-**### Pull Requests**
+### **Pull Requests**
 
 Todo cambio destinado a `main` debe integrarse mediante un Pull Request.
 
@@ -209,7 +209,7 @@ Los Pull Requests deben:
 
 No se deben crear Pull Requests que mezclen funcionalidades independientes o cambios innecesarios.
 
-**### Integración**
+### **Integración**
 
 Una vez aprobado el Pull Request, se podrá integrar el cambio en `main` mediante las opciones de merge habilitadas en el repositorio.
 
