@@ -231,6 +231,27 @@ Se utilizará `.env.example` como referencia para que cada colaborador pueda con
 
 **Importante:** las variables con prefijo `EXPO_PUBLIC_` son accesibles desde el código del frontend. No deben contener contraseñas, claves privadas ni credenciales administrativas.
 
+## Portal administrativo (módulo 5)
+
+El portal es solo para web y se abre en `/admin`. La parte del módulo 5 es el inicio de sesión (`/admin/login`), Instituciones, Usuarios (con el registro de administradores) y Parámetros, además de la barra lateral y el encabezado del portal.
+
+Su código está en estas carpetas:
+
+- `app/(web)/admin/`: rutas. Las de esta parte solo apuntan a las pantallas de `src/features/admin/`.
+- `components/admin/`: componentes del portal.
+- `src/features/admin/`: pantallas, llamadas al API, sesión y tema.
+- `assets/images/admin/`: logo y nombre de la barra lateral.
+
+Esta parte usa siempre el Backend, también con `EXPO_PUBLIC_USE_MOCKS=true`. Se necesita el Backend en ejecución y su dirección en `.env`:
+
+```env
+EXPO_PUBLIC_API_URL=http://localhost:3000/api
+```
+
+Al portal se entra con un administrador. El primero se crea desde la terminal del Backend (`npx tsx src/admin/crear-administrador.ts`); los demás se registran en la sección Usuarios. Sin sesión, `/admin` lleva a la pantalla de inicio de sesión.
+
+Las secciones de Análisis (Consultas generales y Estadísticas) no son de este módulo: se muestran dentro del mismo portal y por ahora usan datos simulados.
+
 ## Backend
 
 La aplicación consume los servicios proporcionados por el repositorio de Backend, donde se implementa la lógica de negocio y la comunicación con la base de datos.

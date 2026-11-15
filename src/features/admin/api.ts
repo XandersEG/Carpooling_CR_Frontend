@@ -1,0 +1,240 @@
+import { router } from 'expo-router';
+
+import { cerrarSesion, leerSesion } from './session';
+import type {
+  Administrador,
+  Campo,
+  Catalogo,
+  Institucion,
+  UsuarioDetalle,
+  UsuarioResumen,
+  ValorCatalogo,
+} from './types';
+
+// llamadas al api del portal administrativo
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+// error de una petición, con los mensajes listos para mostrar
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly mensajes: string[],
+  ) {
+    super(mensajes[0]);
+  }
+}
+
+// mensajes para mostrar a partir de cualquier error atrapado
+export function mensajesDe(error: unknown): string[] {
+  if (error instanceof ApiError) {
+    return error.mensajes;
+  }
+  console.error(error);
+  return ['Ocurrió un error inesperado.'];
+}
+
+// mensaje propio cuando el servidor no dio uno pensado para el usuario
+function mensajePorDefecto(status: number): string {
+  if (status === 401) return 'Tu sesión venció. Inicia sesión de nuevo.';
+  if (status === 403) return 'No tienes permiso para hacer esto.';
+  if (status === 404) return 'El servidor no encontró lo que se pidió.';
+  if (status === 429) return 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.';
+  if (status >= 500) return 'Ocurrió un error en el servidor. Inténtalo de nuevo.';
+  return 'El servidor rechazó la solicitud.';
+}
+
+// solo se muestran los mensajes que el back end escribió en español
+async function leerMensajes(respuesta: Response): Promise<string[]> {
+  if (respuesta.status < 500) {
+    try {
+      const cuerpo = (await respuesta.json()) as {
+        message?: unknown;
+        error?: unknown;
+      };
+      const lista = Array.isArray(cuerpo.message) ? cuerpo.message : [cuerpo.message];
+      const mensajes = lista.filter((m): m is string => typeof m === 'string' && m.length > 0);
+      // sin "error" es un texto por defecto de nest; "Cannot GET" es una ruta que no existe
+      const esPropio = cuerpo.error !== undefined && !mensajes.some((m) => m.startsWith('Cannot '));
+      if (mensajes.length > 0 && esPropio) {
+        return mensajes;
+      }
+    } catch {
+      // el cuerpo no es json: se usa el mensaje por defecto
+    }
+  }
+  return [mensajePorDefecto(respuesta.status)];
+}
+
+type Opciones = {
+  metodo?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  cuerpo?: unknown;
+  consulta?: Record<string, string | number | undefined>;
+  // la petición no lleva sesión: es la de iniciar sesión
+  sinSesion?: boolean;
+};
+
+// hace una petición al back end y devuelve su respuesta.  
+async function pedir<T>(ruta: string, opciones: Opciones = {}): Promise<T> {
+  if (!API_URL) {
+    throw new ApiError(0, ['Falta configurar EXPO_PUBLIC_API_URL en el archivo .env.']);
+  }
+
+  const consulta = new URLSearchParams();
+  for (const [clave, valor] of Object.entries(opciones.consulta ?? {})) {
+    if (valor !== undefined && valor !== '') {
+      consulta.append(clave, String(valor));
+    }
+  }
+  const filtros = consulta.toString();
+  const url = `${API_URL}${ruta}${filtros ? `?${filtros}` : ''}`;
+
+  const cabeceras: Record<string, string> = { Accept: 'application/json' };
+  const sesion = opciones.sinSesion ? null : leerSesion();
+  if (sesion) {
+    cabeceras.Authorization = `Bearer ${sesion.token}`;
+  }
+  if (opciones.cuerpo !== undefined) {
+    cabeceras['Content-Type'] = 'application/json';
+  }
+
+  let respuesta: Response;
+  try {
+    respuesta = await fetch(url, {
+      method: opciones.metodo ?? 'GET',
+      headers: cabeceras,
+      body: opciones.cuerpo !== undefined ? JSON.stringify(opciones.cuerpo) : undefined,
+    });
+  } catch {
+    throw new ApiError(0, [
+      'No se pudo conectar con el servidor. Revisa que el back end esté en ejecución e inténtalo de nuevo.',
+    ]);
+  }
+
+  if (!respuesta.ok) {
+    // la sesión venció o se cerró desde otro lugar: hay que volver a entrar.
+    // si ya hay otra sesión guardada, esta respuesta es de la anterior y no la toca
+    if (respuesta.status === 401 && !opciones.sinSesion && leerSesion()?.token === sesion?.token) {
+      cerrarSesion();
+      router.replace('/admin/login?vencida=1');
+    }
+    throw new ApiError(respuesta.status, await leerMensajes(respuesta));
+  }
+  if (respuesta.status === 204) {
+    return undefined as T;
+  }
+  try {
+    return (await respuesta.json()) as T;
+  } catch {
+    throw new ApiError(0, [
+      'La respuesta no vino del back end. Revisa que EXPO_PUBLIC_API_URL apunte al back end (por ejemplo, http://localhost:3000/api).',
+    ]);
+  }
+}
+
+/* ------------------------------ parametros ------------------------------ */
+
+export const listarCatalogos = () => pedir<Catalogo[]>('/admin/catalogs');
+
+// "catalogo" es la clave del catálogo, por ejemplo "metodos-pago"
+export const listarValores = (catalogo: string) =>
+  pedir<ValorCatalogo[]>(`/admin/catalogs/${catalogo}/values`);
+
+// datos de un parámetro; de los campos propios se envían solo los de su catálogo
+export type DatosValor = {
+  nombre: string;
+  activo: boolean;
+} & Partial<Record<Campo, string | number | null>>;
+
+export const crearValor = (catalogo: string, datos: DatosValor) =>
+  pedir<ValorCatalogo>(`/admin/catalogs/${catalogo}/values`, {
+    metodo: 'POST',
+    cuerpo: datos,
+  });
+
+export const actualizarValor = (catalogo: string, valorId: number, cambios: Partial<DatosValor>) =>
+  pedir<ValorCatalogo>(`/admin/catalogs/${catalogo}/values/${valorId}`, {
+    metodo: 'PATCH',
+    cuerpo: cambios,
+  });
+
+export const borrarValor = (catalogo: string, valorId: number) =>
+  pedir<void>(`/admin/catalogs/${catalogo}/values/${valorId}`, {
+    metodo: 'DELETE',
+  });
+
+/* ----------------------------- instituciones ---------------------------- */
+
+export const listarInstituciones = () => pedir<Institucion[]>('/admin/institutions');
+
+export const crearInstitucion = (datos: { nombre: string; dominioCorreo: string }) =>
+  pedir<Institucion>('/admin/institutions', { metodo: 'POST', cuerpo: datos });
+
+export const actualizarInstitucion = (
+  id: number,
+  cambios: { nombre?: string; dominioCorreo?: string; activo?: boolean },
+) =>
+  pedir<Institucion>(`/admin/institutions/${id}`, {
+    metodo: 'PATCH',
+    cuerpo: cambios,
+  });
+
+/* -------------------------------- usuarios ------------------------------ */
+
+// debe ser igual al valor del back end
+export const USUARIOS_POR_PAGINA = 18;
+
+export const listarUsuarios = (filtros: {
+  buscar?: string;
+  institucionId?: number;
+  pagina: number;
+}) =>
+  pedir<{ datos: UsuarioResumen[]; total: number }>('/admin/users', {
+    consulta: filtros,
+  });
+
+export const obtenerUsuario = (id: number) => pedir<UsuarioDetalle>(`/admin/users/${id}`);
+
+export const actualizarUsuario = (
+  id: number,
+  cambios: {
+    nombre?: string;
+    apellidos?: string;
+    telefono?: string | null;
+    activo?: boolean;
+  },
+) =>
+  pedir<void>(`/admin/users/${id}`, {
+    metodo: 'PATCH',
+    cuerpo: cambios,
+  });
+
+/* ---------------------------- administradores --------------------------- */
+
+export const listarAdministradores = () => pedir<Administrador[]>('/admin/administrators');
+
+export const crearAdministrador = (datos: { nombre: string; correo: string; password: string }) =>
+  pedir<Administrador>('/admin/administrators', { metodo: 'POST', cuerpo: datos });
+
+// la contraseña solo se envía cuando se quiere cambiar
+export const actualizarAdministrador = (
+  id: number,
+  cambios: { nombre?: string; correo?: string; password?: string; activo?: boolean },
+) =>
+  pedir<void>(`/admin/administrators/${id}`, {
+    metodo: 'PATCH',
+    cuerpo: cambios,
+  });
+
+/* --------------------------------- sesion ------------------------------- */
+
+// con "recordar" el servidor da una sesión más larga
+export const iniciarSesion = (correo: string, password: string, recordar: boolean) =>
+  pedir<{ token: string; nombre: string }>('/admin/auth/login', {
+    metodo: 'POST',
+    cuerpo: { correo, password, recordar },
+    sinSesion: true,
+  });
+
+// avisa al servidor para que el token deje de servir
+export const cerrarSesionEnServidor = () => pedir<void>('/admin/auth/logout', { metodo: 'POST' });
