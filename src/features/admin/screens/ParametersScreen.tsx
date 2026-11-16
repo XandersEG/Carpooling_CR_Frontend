@@ -434,7 +434,7 @@ export function ParametersScreen() {
       if (valores.errores.length > 0) return null;
       // mientras no lleguen los valores de este catálogo, todavía está cargando
       if (valores.cargando || valores.datos?.clave !== clave) return 'Cargando…';
-      return 'Este catálogo todavía no tiene parámetros. Agrega el primero con «Nuevo Parámetro».';
+      return 'Este catálogo todavía no tiene parámetros. Agrega el primero con «Nuevo parámetro».';
     }
     return filas.length === 0 ? 'Ningún parámetro coincide con el filtro.' : null;
   }
@@ -450,12 +450,12 @@ export function ParametersScreen() {
 
   return (
     <Screen
-      title="Gestión de Parámetros"
+      title="Gestión > Parámetros"
       subtitle="Administra los catálogos de opciones que se muestran en la app móvil y el portal web."
       toast={toast}
       action={
         <PillButton
-          label="Nuevo Parámetro"
+          label="Nuevo parámetro"
           icon="add-circle-outline"
           grande
           onPress={() => setDialogo({ tipo: 'guardar' })}
@@ -506,7 +506,7 @@ export function ParametersScreen() {
           <View style={styles.cabecera}>
             <View style={styles.punto} />
             <Text style={styles.tituloTabla} accessibilityRole="header">
-              {catalogo ? `Catálogo de ${catalogo.nombre}` : 'Catálogos'}
+              {catalogo ? `Catálogo de ${catalogo.nombre.toLowerCase()}` : 'Catálogos'}
             </Text>
             <Select
               label="Filtrar por estado"

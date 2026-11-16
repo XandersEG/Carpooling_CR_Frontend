@@ -12,11 +12,11 @@ import { createId, notFound, respond } from '../mock/utils';
 
 /** Nombres de los catálogos tal como aparecen en el portal. */
 export const catalogLabels: Record<CatalogKey, string> = {
-  'metodos-pago': 'Métodos de Pago',
-  'tipos-vehiculo': 'Tipos de Vehículo',
-  'rangos-edad': 'Rangos de Edad',
-  'opciones-genero': 'Opciones de Género',
-  'reglas-tarifas': 'Reglas y Tarifas',
+  'metodos-pago': 'Métodos de pago',
+  'tipos-vehiculo': 'Tipos de vehículo',
+  'rangos-edad': 'Rangos de edad',
+  'opciones-genero': 'Opciones de género',
+  'reglas-tarifas': 'Reglas y tarifas',
 };
 
 function items<K extends CatalogKey>(key: K): CatalogItemMap[K][] {

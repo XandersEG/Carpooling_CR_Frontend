@@ -110,11 +110,11 @@ export function InstitutionsScreen() {
       toast={toast}
     >
       <View style={[styles.tarjeta, styles.titulos]}>
-        <Text style={[styles.titulo, styles.columna]}>Nombre Institución</Text>
+        <Text style={[styles.titulo, styles.columna]}>Nombre de institución</Text>
         <Text style={[styles.titulo, styles.columna, styles.separado]}>Dominio de correo</Text>
         <View style={[styles.acciones, styles.separado]}>
           <PillButton
-            label="Agregar Institución"
+            label="Agregar institución"
             tono="oscuro"
             icon="add-circle-outline"
             onPress={() => setDialogo({})}
@@ -129,7 +129,7 @@ export function InstitutionsScreen() {
         {cargando && datos === undefined ? <Text style={styles.vacio}>Cargando…</Text> : null}
         {datos !== undefined && instituciones.length === 0 ? (
           <Text style={styles.vacio}>
-            Todavía no hay instituciones. Agrega la primera con «Agregar Institución».
+            Todavía no hay instituciones. Agrega la primera con «Agregar institución».
           </Text>
         ) : null}
         {instituciones.map((institucion, indice) => (
