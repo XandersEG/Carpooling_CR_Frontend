@@ -236,5 +236,21 @@ export const iniciarSesion = (correo: string, password: string, recordar: boolea
     sinSesion: true,
   });
 
+// pide el correo con el enlace para cambiar la contraseña; el servidor responde igual exista o no la cuenta
+export const pedirRestablecimiento = (correo: string) =>
+  pedir<void>('/admin/auth/password-reset', {
+    metodo: 'POST',
+    cuerpo: { correo },
+    sinSesion: true,
+  });
+
+// cambia la contraseña con el token que llegó en el enlace del correo
+export const restablecerContrasena = (token: string, password: string) =>
+  pedir<void>('/admin/auth/password-reset/confirm', {
+    metodo: 'POST',
+    cuerpo: { token, password },
+    sinSesion: true,
+  });
+
 // avisa al servidor para que el token deje de servir
 export const cerrarSesionEnServidor = () => pedir<void>('/admin/auth/logout', { metodo: 'POST' });

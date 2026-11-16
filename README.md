@@ -250,6 +250,8 @@ EXPO_PUBLIC_API_URL=http://localhost:3000/api
 
 Al portal se entra con un administrador. El primero se crea desde la terminal del Backend (`npx tsx src/admin/crear-administrador.ts`); los demás se registran en la sección Usuarios. Sin sesión, `/admin` lleva a la pantalla de inicio de sesión.
 
+Quien olvida su contraseña la recupera desde "¿Olvidaste tu contraseña?" (`/admin/recuperar`): el Backend le envía un correo con un enlace a `/admin/restablecer`, donde escribe la nueva. El envío del correo se configura en el `.env` del Backend.
+
 Las secciones de Análisis (Consultas generales y Estadísticas) no son de este módulo: se muestran dentro del mismo portal y por ahora usan datos simulados.
 
 ## Backend

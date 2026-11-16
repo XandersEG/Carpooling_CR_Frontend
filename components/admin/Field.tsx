@@ -3,7 +3,8 @@ import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-na
 import { color, fuente } from '@/src/features/admin/theme';
 
 type Props = TextInputProps & {
-  label: string;
+  // sin etiqueta, el campo debe traer su accessibilityLabel
+  label?: string;
   // marca el campo en color de error
   conError?: boolean;
 };
@@ -12,7 +13,7 @@ type Props = TextInputProps & {
 export function Field({ label, conError = false, style, ...input }: Props) {
   return (
     <View style={styles.campo}>
-      <Text style={styles.etiqueta}>{label}</Text>
+      {label ? <Text style={styles.etiqueta}>{label}</Text> : null}
       <TextInput
         accessibilityLabel={label}
         placeholderTextColor={color.textoSuave}
