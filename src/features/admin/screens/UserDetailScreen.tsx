@@ -214,7 +214,7 @@ export function UserDetailScreen() {
                 <View style={styles.acciones}>
                   {usuario.activo ? (
                     <PillButton
-                      label="Eliminar Usuario"
+                      label="Desactivar usuario"
                       tono="oscuro"
                       onPress={() => setConfirmando(true)}
                     />
