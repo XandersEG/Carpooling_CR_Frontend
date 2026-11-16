@@ -1,0 +1,121 @@
+--- before/VehicleCard.tsx	2026-11-15 21:22:16.838688261 -0600
++++ entrega/components/mobile/driver/VehicleCard.tsx	2026-11-15 21:27:08.565388147 -0600
+@@ -40,59 +40,63 @@
+   const photo = getVehiclePhoto(vehicle);
+   const name = vehicleName(vehicle);
+ 
++  // Los botones Editar/Eliminar quedan fuera del Pressable de la tarjeta: en web un
++  // <button> dentro de otro <button> es HTML inválido (error de hidratación).
+   return (
+-    <Pressable
+-      accessibilityRole={onPress ? 'button' : undefined}
+-      accessibilityLabel={`${name} ${vehicle.plate}${vehicle.active ? ', activo' : ''}`}
+-      disabled={!onPress}
+-      onPress={onPress}
+-      style={({ pressed }) => [styles.card, pressed ? styles.pressed : null, style]}
+-    >
+-      <View style={[styles.header, vehicle.active ? styles.headerActive : styles.headerInactive]}>
+-        <View style={styles.photoSlot}>
+-          {photo ? (
+-            <Image
+-              source={photo.source}
+-              resizeMode="contain"
+-              style={{ position: 'absolute', top: photo.box.top, width: photo.box.width, height: photo.box.height }}
+-              accessibilityIgnoresInvertColors
+-            />
+-          ) : null}
+-        </View>
+-        <View style={styles.headerText}>
+-          <Text style={styles.name} numberOfLines={1}>
+-            {name}
+-          </Text>
+-          {vehicle.active ? (
+-            <View style={styles.badge}>
+-              <View style={styles.badgeDot} />
+-              <Text style={styles.badgeText}>Activo</Text>
+-            </View>
++    <View style={[styles.card, style]}>
++      <Pressable
++        accessibilityRole={onPress ? 'button' : undefined}
++        accessibilityLabel={`${name} ${vehicle.plate}${vehicle.active ? ', activo' : ''}`}
++        disabled={!onPress}
++        onPress={onPress}
++        style={({ pressed }) => (pressed ? styles.pressed : null)}
++      >
++        <View style={[styles.header, vehicle.active ? styles.headerActive : styles.headerInactive]}>
++          <View style={styles.photoSlot}>
++            {photo ? (
++              <Image
++                source={photo.source}
++                resizeMode="contain"
++                style={{ position: 'absolute', top: photo.box.top, width: photo.box.width, height: photo.box.height }}
++                accessibilityIgnoresInvertColors
++              />
++            ) : null}
++          </View>
++          <View style={styles.headerText}>
++            <Text style={styles.name} numberOfLines={1}>
++              {name}
++            </Text>
++            {vehicle.active ? (
++              <View style={styles.badge}>
++                <View style={styles.badgeDot} />
++                <Text style={styles.badgeText}>Activo</Text>
++              </View>
++            ) : null}
++          </View>
++          {showChevron ? (
++            <IconChevronAbajo width={13.5} height={8.7} color={colors.textPrimary} style={styles.chevron} />
+           ) : null}
+         </View>
+-        {showChevron ? (
+-          <IconChevronAbajo width={13.5} height={8.7} color={colors.textPrimary} style={styles.chevron} />
+-        ) : null}
+-      </View>
+ 
+-      <View style={styles.specs}>
+-        <View style={styles.column}>
+-          <Spec label="Placa" value={vehicle.plate} />
+-          <Spec label="Marca" value={vehicle.brand} />
+-          <Spec label="Modelo" value={vehicle.model} />
+-        </View>
+-        <View style={styles.divider} />
+-        <View style={styles.column}>
+-          <Spec label="Color" value={vehicle.color} />
+-          <View style={styles.specRow}>
+-            <Text style={styles.specLabel}>Capacidad</Text>
+-            <View style={styles.capacity}>
+-              <Image source={imgPersonas} style={styles.peopleIcon} resizeMode="contain" />
+-              <Text style={styles.specValue}>{formatPassengers(capacity)}</Text>
++        <View style={styles.specs}>
++          <View style={styles.column}>
++            <Spec label="Placa" value={vehicle.plate} />
++            <Spec label="Marca" value={vehicle.brand} />
++            <Spec label="Modelo" value={vehicle.model} />
++          </View>
++          <View style={styles.divider} />
++          <View style={styles.column}>
++            <Spec label="Color" value={vehicle.color} />
++            <View style={styles.specRow}>
++              <Text style={styles.specLabel}>Capacidad</Text>
++              <View style={styles.capacity}>
++                <Image source={imgPersonas} style={styles.peopleIcon} resizeMode="contain" />
++                <Text style={styles.specValue}>{formatPassengers(capacity)}</Text>
++              </View>
+             </View>
+           </View>
+         </View>
+-      </View>
++      </Pressable>
+ 
+       {onEdit || onDelete ? (
+         <View style={styles.actions}>
+@@ -120,7 +124,7 @@
+           ) : null}
+         </View>
+       ) : null}
+-    </Pressable>
++    </View>
+   );
+ }
+ 
