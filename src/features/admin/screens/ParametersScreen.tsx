@@ -23,6 +23,7 @@ import {
 import { color, fuente } from '../theme';
 import type { Campo, Catalogo, ValorCatalogo } from '../types';
 import { useData } from '../useData';
+import { useLayout } from '../useLayout';
 
 const ESTADOS = [
   { value: 'todos', label: 'Todos los estados' },
@@ -197,15 +198,20 @@ type InterruptorProps = { activo: boolean; onChange: (activo: boolean) => void }
 
 // interruptor de activo o inactivo
 function Interruptor({ activo, onChange }: InterruptorProps) {
+  const { angosta } = useLayout();
+  const pista = [styles.interruptor, activo ? styles.interruptorActivo : null];
+  const perilla = <View style={[styles.perilla, activo ? styles.perillaActiva : null]} />;
+
   return (
     <Pressable
       onPress={() => onChange(!activo)}
       accessibilityRole="switch"
       accessibilityLabel="Estado"
       aria-checked={activo}
-      style={[styles.interruptor, activo ? styles.interruptorActivo : null]}
+      // en pantallas angostas se ve igual, pero se toca en una zona de 44 px
+      style={angosta ? styles.zonaTactil : pista}
     >
-      <View style={[styles.perilla, activo ? styles.perillaActiva : null]} />
+      {angosta ? <View style={pista}>{perilla}</View> : perilla}
     </Pressable>
   );
 }
@@ -228,6 +234,7 @@ function ParameterDialog({ catalogos, clave, valor, onClose, onSaved }: Paramete
   const [activo, setActivo] = useState(valor?.activo ?? true);
   const [guardando, setGuardando] = useState(false);
   const [errores, setErrores] = useState<string[]>([]);
+  const { celular } = useLayout();
 
   const catalogo = catalogos.find((item) => item.clave === elegida);
   const campos = catalogo?.campos ?? [];
@@ -266,9 +273,16 @@ function ParameterDialog({ catalogos, clave, valor, onClose, onSaved }: Paramete
       errores={errores}
       footer={
         <>
-          <PillButton label="Cancelar" tono="gris" onPress={onClose} disabled={guardando} />
+          <PillButton
+            label="Cancelar"
+            tono="gris"
+            expandido
+            onPress={onClose}
+            disabled={guardando}
+          />
           <PillButton
             label={valor ? 'Guardar cambios' : 'Agregar'}
+            expandido
             onPress={() => void guardar()}
             ocupado={guardando}
           />
@@ -298,7 +312,8 @@ function ParameterDialog({ catalogos, clave, valor, onClose, onSaved }: Paramete
         autoFocus
       />
       {campos.length > 0 ? (
-        <View style={styles.propios}>
+        // en celular los campos cortos se acercan un poco para seguir cabiendo de dos en dos
+        <View style={[styles.propios, celular ? styles.propiosCelular : null]}>
           {campos.map((campo) => {
             const definicion = CAMPOS[campo];
             return (
@@ -371,10 +386,17 @@ function DeleteDialog({ catalogo, valor, onClose, onDeleted }: DeleteDialogProps
       errores={errores}
       footer={
         <>
-          <PillButton label="Cancelar" tono="gris" onPress={onClose} disabled={borrando} />
+          <PillButton
+            label="Cancelar"
+            tono="gris"
+            expandido
+            onPress={onClose}
+            disabled={borrando}
+          />
           <PillButton
             label="Eliminar"
             tono="terracota"
+            expandido
             onPress={() => void borrar()}
             ocupado={borrando}
           />
@@ -395,8 +417,9 @@ function DeleteDialog({ catalogo, valor, onClose, onDeleted }: DeleteDialogProps
 type Dialogo =
   { tipo: 'guardar'; valor?: ValorCatalogo } | { tipo: 'borrar'; valor: ValorCatalogo };
 
-// sección de parámetros: los cinco catálogos y los valores de cada uno.  
+// sección de parámetros: los cinco catálogos y sus valores, que en celular son tarjetas.  
 export function ParametersScreen() {
+  const { angosta, celular } = useLayout();
   const catalogos = useData(listarCatalogos, []);
   const [elegida, setElegida] = useState<string | null>(null);
   const [buscar, setBuscar] = useState('');
@@ -448,6 +471,23 @@ export function ParametersScreen() {
 
   const sinFilas = textoSinFilas();
 
+  // título del catálogo y filtro de estado; encabezan la tabla o, en celular, las tarjetas
+  const cabecera = (
+    <>
+      <View style={styles.punto} />
+      <Text style={styles.tituloTabla} accessibilityRole="header">
+        {catalogo ? `Catálogo de ${catalogo.nombre.toLowerCase()}` : 'Catálogos'}
+      </Text>
+      <Select
+        label="Filtrar por estado"
+        value={estado}
+        options={ESTADOS}
+        onChange={setEstado}
+        ancho={celular ? '100%' : 180}
+      />
+    </>
+  );
+
   return (
     <Screen
       title="Gestión > Parámetros"
@@ -466,8 +506,11 @@ export function ParametersScreen() {
       <View style={styles.columna}>
         <Notice mensajes={catalogos.errores} onRetry={catalogos.recargar} />
 
-        <View style={[styles.tarjeta, styles.catalogos]}>
-          <View style={styles.chips} accessibilityRole="tablist">
+        <View style={[styles.tarjeta, styles.catalogos, celular ? styles.catalogosCelular : null]}>
+          <View
+            style={[styles.chips, celular ? styles.chipsCelular : null]}
+            accessibilityRole="tablist"
+          >
             {lista.map((item) => {
               const actual = item.clave === clave;
               return (
@@ -476,18 +519,32 @@ export function ParametersScreen() {
                   onPress={() => setElegida(item.clave)}
                   accessibilityRole="tab"
                   aria-selected={actual}
-                  style={[styles.chip, actual ? styles.chipActual : null]}
+                  style={[
+                    styles.chip,
+                    celular ? styles.chipCelular : null,
+                    actual ? styles.chipActual : null,
+                  ]}
                 >
                   <Ionicons name="wallet-outline" size={18} color={color.texto} />
-                  <Text style={styles.textoChip}>{item.nombre}</Text>
+                  <Text style={[styles.textoChip, celular ? styles.textoChipCelular : null]}>
+                    {item.nombre}
+                  </Text>
                   <View style={styles.cuenta}>
-                    <Text style={styles.textoCuenta}>{item.total}</Text>
+                    <Text style={[styles.textoCuenta, angosta ? styles.textoLegible : null]}>
+                      {item.total}
+                    </Text>
                   </View>
                 </Pressable>
               );
             })}
           </View>
-          <View style={styles.buscador}>
+          <View
+            style={[
+              styles.buscador,
+              angosta ? styles.buscadorTactil : null,
+              celular ? styles.buscadorCelular : null,
+            ]}
+          >
             <Ionicons name="search-outline" size={16} color={color.textoSuave} />
             <TextInput
               value={buscar}
@@ -495,82 +552,143 @@ export function ParametersScreen() {
               placeholder="Buscar parámetro..."
               placeholderTextColor={color.textoSuave}
               accessibilityLabel="Buscar parámetro"
-              style={styles.entradaBuscar}
+              style={[styles.entradaBuscar, angosta ? styles.entradaTactil : null]}
             />
           </View>
         </View>
 
         <Notice mensajes={valores.errores} onRetry={valores.recargar} />
 
-        <View style={[styles.tarjeta, styles.tabla]}>
-          <View style={styles.cabecera}>
-            <View style={styles.punto} />
-            <Text style={styles.tituloTabla} accessibilityRole="header">
-              {catalogo ? `Catálogo de ${catalogo.nombre.toLowerCase()}` : 'Catálogos'}
-            </Text>
-            <Select
-              label="Filtrar por estado"
-              value={estado}
-              options={ESTADOS}
-              onChange={setEstado}
-              ancho={180}
-            />
-          </View>
-
-          <View style={[styles.fila, styles.titulos]}>
-            <Text style={[styles.titulo, styles.colNombre]}>{textos.columna}</Text>
-            {columnas.map((campo) => (
-              <Text
-                key={campo}
-                style={[
-                  styles.titulo,
-                  campo === 'descripcion' ? styles.colAncha : styles.colPropia,
-                ]}
-              >
-                {CAMPOS[campo].etiqueta.toUpperCase()}
-              </Text>
+        {celular ? (
+          <>
+            <View style={[styles.tarjeta, styles.cabecera, styles.cabeceraCelular]}>
+              {cabecera}
+            </View>
+            {sinFilas ? (
+              <View style={styles.tarjeta}>
+                <Text style={styles.vacio}>{sinFilas}</Text>
+              </View>
+            ) : null}
+            {filas.map((valor) => (
+              <View key={valor.id} style={[styles.tarjeta, styles.ficha]}>
+                <View style={styles.cabeceraFicha}>
+                  <Text style={styles.nombreFicha}>{valor.nombre}</Text>
+                  <StatusPill activo={valor.activo} />
+                </View>
+                <View style={styles.propios}>
+                  {columnas.map((campo) => {
+                    const texto = CAMPOS[campo].celda?.(valor);
+                    // un campo sin dato no ocupa lugar en la tarjeta
+                    return texto ? (
+                      <View
+                        key={campo}
+                        style={campo === 'descripcion' ? styles.completo : styles.medio}
+                      >
+                        <Text style={styles.etiquetaFicha}>{CAMPOS[campo].etiqueta}</Text>
+                        <Text style={styles.celdaFicha}>{texto}</Text>
+                      </View>
+                    ) : null;
+                  })}
+                </View>
+                <View style={styles.botones}>
+                  <PillButton
+                    label="Editar"
+                    tono="malva"
+                    icon="create-outline"
+                    expandido
+                    onPress={() => setDialogo({ tipo: 'guardar', valor })}
+                  />
+                  <PillButton
+                    label="Eliminar"
+                    tono="terracota"
+                    icon="trash-outline"
+                    expandido
+                    onPress={() => setDialogo({ tipo: 'borrar', valor })}
+                  />
+                </View>
+              </View>
             ))}
-            <Text style={[styles.titulo, styles.colEstado]}>ESTADO</Text>
-            <Text style={[styles.titulo, styles.colAcciones]}>ACCIONES</Text>
-          </View>
+          </>
+        ) : (
+          <View style={[styles.tarjeta, styles.tabla]}>
+            <View style={styles.cabecera}>{cabecera}</View>
 
-          {sinFilas ? <Text style={styles.vacio}>{sinFilas}</Text> : null}
-          {filas.map((valor) => (
-            <View key={valor.id} style={styles.fila}>
-              <Text style={[styles.nombre, styles.colNombre]}>{valor.nombre}</Text>
+            <View style={[styles.fila, styles.titulos]}>
+              <Text style={[styles.titulo, angosta ? styles.textoLegible : null, styles.colNombre]}>
+                {textos.columna}
+              </Text>
               {columnas.map((campo) => (
                 <Text
                   key={campo}
                   style={[
-                    styles.celda,
+                    styles.titulo,
+                    angosta ? styles.textoLegible : null,
                     campo === 'descripcion' ? styles.colAncha : styles.colPropia,
                   ]}
                 >
-                  {CAMPOS[campo].celda?.(valor)}
+                  {CAMPOS[campo].etiqueta.toUpperCase()}
                 </Text>
               ))}
-              <View style={styles.colEstado}>
-                <StatusPill activo={valor.activo} />
-              </View>
-              <View style={[styles.colAcciones, styles.acciones]}>
-                <Pressable
-                  onPress={() => setDialogo({ tipo: 'guardar', valor })}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Editar ${valor.nombre ?? ''}`}
-                >
-                  <Ionicons name="create-outline" size={21} color={color.texto} />
-                </Pressable>
-                <Pressable
-                  onPress={() => setDialogo({ tipo: 'borrar', valor })}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Eliminar ${valor.nombre ?? ''}`}
-                >
-                  <Ionicons name="trash-outline" size={21} color={color.texto} />
-                </Pressable>
-              </View>
+              <Text style={[styles.titulo, angosta ? styles.textoLegible : null, styles.colEstado]}>
+                ESTADO
+              </Text>
+              <Text
+                style={[
+                  styles.titulo,
+                  styles.colAcciones,
+                  angosta ? styles.tituloAccionesTactil : null,
+                ]}
+              >
+                ACCIONES
+              </Text>
             </View>
-          ))}
-        </View>
+
+            {sinFilas ? <Text style={styles.vacio}>{sinFilas}</Text> : null}
+            {filas.map((valor) => (
+              <View key={valor.id} style={styles.fila}>
+                <Text style={[styles.nombre, styles.colNombre]}>{valor.nombre}</Text>
+                {columnas.map((campo) => (
+                  <Text
+                    key={campo}
+                    style={[
+                      styles.celda,
+                      campo === 'descripcion' ? styles.colAncha : styles.colPropia,
+                    ]}
+                  >
+                    {CAMPOS[campo].celda?.(valor)}
+                  </Text>
+                ))}
+                <View style={styles.colEstado}>
+                  <StatusPill activo={valor.activo} />
+                </View>
+                <View
+                  style={[
+                    styles.colAcciones,
+                    styles.acciones,
+                    angosta ? styles.accionesTactiles : null,
+                  ]}
+                >
+                  <Pressable
+                    onPress={() => setDialogo({ tipo: 'guardar', valor })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Editar ${valor.nombre ?? ''}`}
+                    style={angosta ? styles.zonaIcono : undefined}
+                  >
+                    <Ionicons name="create-outline" size={21} color={color.texto} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setDialogo({ tipo: 'borrar', valor })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Eliminar ${valor.nombre ?? ''}`}
+                    style={angosta ? styles.zonaIcono : undefined}
+                  >
+                    <Ionicons name="trash-outline" size={21} color={color.texto} />
+                  </Pressable>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
 
       {dialogo?.tipo === 'guardar' && catalogo ? (
@@ -826,5 +944,93 @@ const styles = StyleSheet.create({
   },
   perillaActiva: {
     alignSelf: 'flex-end',
+  },
+  // zona de 44 px para tocar con el dedo
+  zonaTactil: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  zonaIcono: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // en pantallas angostas ningún texto baja de 12 px
+  textoLegible: {
+    fontSize: 12,
+  },
+  // los dos iconos ocupan 88 px; el título se corre para quedar sobre el primero
+  tituloAccionesTactil: {
+    width: 88,
+    paddingLeft: 11,
+    fontSize: 12,
+  },
+  accionesTactiles: {
+    width: 88,
+    gap: 0,
+  },
+  propiosCelular: {
+    columnGap: 12,
+  },
+  catalogosCelular: {
+    padding: 16,
+  },
+  chipsCelular: {
+    flexBasis: '100%',
+  },
+  // dos chips por fila, del mismo ancho
+  chipCelular: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: '40%',
+    maxWidth: '49%',
+  },
+  textoChipCelular: {
+    flex: 1,
+    maxWidth: '100%',
+  },
+  buscadorTactil: {
+    minHeight: 44,
+  },
+  buscadorCelular: {
+    width: '100%',
+  },
+  entradaTactil: {
+    minHeight: 44,
+    fontSize: 16,
+  },
+  cabeceraCelular: {
+    paddingHorizontal: 16,
+  },
+  ficha: {
+    gap: 8,
+    padding: 16,
+  },
+  cabeceraFicha: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  nombreFicha: {
+    flex: 1,
+    fontFamily: fuente.negrita,
+    fontSize: 15,
+    color: color.texto,
+  },
+  etiquetaFicha: {
+    fontFamily: fuente.normal,
+    fontSize: 12,
+    color: color.malva,
+  },
+  celdaFicha: {
+    fontFamily: fuente.normal,
+    fontSize: 14,
+    color: color.texto,
+  },
+  botones: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
   },
 });

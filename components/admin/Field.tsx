@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { color, fuente } from '@/src/features/admin/theme';
+import { useLayout } from '@/src/features/admin/useLayout';
 
 type Props = TextInputProps & {
   // sin etiqueta, el campo debe traer su accessibilityLabel
@@ -11,13 +12,20 @@ type Props = TextInputProps & {
 
 // campo de texto con su etiqueta
 export function Field({ label, conError = false, style, ...input }: Props) {
+  const { angosta } = useLayout();
+
   return (
     <View style={styles.campo}>
       {label ? <Text style={styles.etiqueta}>{label}</Text> : null}
       <TextInput
         accessibilityLabel={label}
         placeholderTextColor={color.textoSuave}
-        style={[styles.entrada, conError ? styles.entradaConError : null, style]}
+        style={[
+          styles.entrada,
+          angosta ? styles.entradaTactil : null,
+          conError ? styles.entradaConError : null,
+          style,
+        ]}
         {...input}
       />
     </View>
@@ -44,6 +52,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.linea,
     borderRadius: 8,
+  },
+  // con letra de 16 px el navegador del celular no amplía la página al enfocar el campo
+  entradaTactil: {
+    minHeight: 44,
+    fontSize: 16,
   },
   entradaConError: {
     borderColor: color.terracota,

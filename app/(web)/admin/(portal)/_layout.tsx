@@ -1,9 +1,9 @@
 import { Redirect, Slot, usePathname } from 'expo-router';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/components/admin/Screen';
-import { Sidebar } from '@/components/admin/Sidebar';
+import { MenuContext, Sidebar } from '@/components/admin/Sidebar';
 import { AdminHeaderProvider, useAdminHeaderState } from '@/components/web/PageHeader';
 import { leerSesion } from '@/src/features/admin/session';
 
@@ -28,26 +28,30 @@ function MarcoDeAnalisis({ children }: { children: ReactNode }) {
 // protege las pantallas del portal y les pone la barra lateral.  
 export default function PortalLayout() {
   const ruta = usePathname();
+  // en pantallas angostas la barra lateral es un cajón que se abre desde el encabezado
+  const [menuAbierto, setMenuAbierto] = useState(false);
   if (!leerSesion()) {
     return <Redirect href="/admin/login" />;
   }
   const esAnalisis = RUTAS_DE_ANALISIS.some((inicio) => ruta.startsWith(inicio));
 
   return (
-    <View style={styles.portal}>
-      <Sidebar />
-      <View style={styles.pantalla}>
-        {esAnalisis ? (
-          <AdminHeaderProvider>
-            <MarcoDeAnalisis>
-              <Slot />
-            </MarcoDeAnalisis>
-          </AdminHeaderProvider>
-        ) : (
-          <Slot />
-        )}
+    <MenuContext.Provider value={() => setMenuAbierto(true)}>
+      <View style={styles.portal}>
+        <Sidebar abierto={menuAbierto} onClose={() => setMenuAbierto(false)} />
+        <View style={styles.pantalla}>
+          {esAnalisis ? (
+            <AdminHeaderProvider>
+              <MarcoDeAnalisis>
+                <Slot />
+              </MarcoDeAnalisis>
+            </AdminHeaderProvider>
+          ) : (
+            <Slot />
+          )}
+        </View>
       </View>
-    </View>
+    </MenuContext.Provider>
   );
 }
 

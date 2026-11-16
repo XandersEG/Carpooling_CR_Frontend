@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import { ANCHO_BARRA_COMPLETA, color, fuente } from '@/src/features/admin/theme';
+import { useLayout } from '@/src/features/admin/useLayout';
 
 import { Field } from './Field';
 
@@ -43,6 +44,9 @@ type Props = {
 // marco de las pantallas de acceso al portal: el panel con el lema y la tarjeta con el logo
 export function AccessScreen({ title, subtitle, sinNota = false, children }: Props) {
   const { width } = useWindowDimensions();
+  const { angosta, celular } = useLayout();
+  // en pantallas angostas ningún texto baja de 12 px
+  const legible = angosta ? styles.textoLegible : null;
 
   return (
     <View style={styles.pantalla}>
@@ -57,16 +61,19 @@ export function AccessScreen({ title, subtitle, sinNota = false, children }: Pro
         </View>
       ) : null}
 
-      <ScrollView style={styles.fondo} contentContainerStyle={styles.contenido}>
+      <ScrollView
+        style={styles.fondo}
+        contentContainerStyle={[styles.contenido, celular ? styles.contenidoCelular : null]}
+      >
         <View style={styles.centro}>
-          <View style={styles.tarjeta}>
+          <View style={[styles.tarjeta, celular ? styles.tarjetaCelular : null]}>
             <Image
               source={require('@/assets/images/logo.png')}
               style={styles.logo}
               resizeMode="contain"
               accessibilityLabel="Tuanis Carpooling"
             />
-            <Text style={styles.portal}>PORTAL ADMINISTRATIVO</Text>
+            <Text style={[styles.portal, legible]}>PORTAL ADMINISTRATIVO</Text>
 
             <Text style={styles.titulo} accessibilityRole="header">
               {title}
@@ -76,11 +83,13 @@ export function AccessScreen({ title, subtitle, sinNota = false, children }: Pro
             {children}
 
             {sinNota ? null : (
-              <Text style={styles.exclusivo}>Acceso exclusivo para personal autorizado</Text>
+              <Text style={[styles.exclusivo, legible]}>
+                Acceso exclusivo para personal autorizado
+              </Text>
             )}
           </View>
         </View>
-        <Text style={styles.pie}>Tuanis Carpooling - Portal administrativo</Text>
+        <Text style={[styles.pie, legible]}>Tuanis Carpooling - Portal administrativo</Text>
       </ScrollView>
     </View>
   );
@@ -90,26 +99,31 @@ type FieldProps = ComponentProps<typeof Field>;
 
 // campo de la tarjeta: más alto que el del portal y con fondo blanco
 export function AccessField({ style, ...campo }: FieldProps) {
-  return <Field style={[styles.entrada, style]} {...campo} />;
+  const { angosta } = useLayout();
+
+  return (
+    <Field style={[styles.entrada, angosta ? styles.entradaTactil : null, style]} {...campo} />
+  );
 }
 
 // campo de contraseña, con el botón del ojo para mostrarla
 export function PasswordField(campo: Omit<FieldProps, 'secureTextEntry' | 'style'>) {
   const [visible, setVisible] = useState(false);
+  const { angosta } = useLayout();
 
   return (
     <View>
       <AccessField
         secureTextEntry={!visible}
         autoCapitalize="none"
-        style={styles.entradaConOjo}
+        style={[styles.entradaConOjo, angosta ? styles.entradaConOjoTactil : null]}
         {...campo}
       />
       <Pressable
         onPress={() => setVisible(!visible)}
         accessibilityRole="button"
         accessibilityLabel={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-        style={styles.ojo}
+        style={[styles.ojo, angosta ? styles.ojoTactil : null]}
       >
         <Ionicons
           name={visible ? 'eye-off-outline' : 'eye-outline'}
@@ -130,15 +144,17 @@ type ButtonProps = {
 
 // botón principal de la tarjeta
 export function AccessButton({ label, onPress, busy = false }: ButtonProps) {
+  const { angosta } = useLayout();
+
   return (
     <Pressable
       onPress={onPress}
       disabled={busy}
       accessibilityRole="button"
-      style={[styles.boton, busy ? styles.botonOcupado : null]}
+      style={[styles.boton, angosta ? styles.botonTactil : null, busy ? styles.botonOcupado : null]}
     >
       {busy ? <ActivityIndicator size="small" color={color.texto} /> : null}
-      <Text style={styles.textoBoton}>{label}</Text>
+      <Text style={[styles.textoBoton, angosta ? styles.textoBotonTactil : null]}>{label}</Text>
     </Pressable>
   );
 }
@@ -154,9 +170,15 @@ export function AccessNotice({ message }: { message: string }) {
 
 // enlace de texto de la tarjeta
 export function AccessLink({ label, onPress }: { label: string; onPress: () => void }) {
+  const { angosta } = useLayout();
+
   return (
-    <Pressable onPress={onPress} accessibilityRole="link">
-      <Text style={styles.enlace}>{label}</Text>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="link"
+      style={angosta ? accessStyles.zonaTactil : undefined}
+    >
+      <Text style={[styles.enlace, angosta ? styles.enlaceTactil : null]}>{label}</Text>
     </Pressable>
   );
 }
@@ -177,6 +199,15 @@ export const accessStyles = StyleSheet.create({
   // deja un enlace pegado a la izquierda en vez de ocupar todo el ancho
   izquierda: {
     alignItems: 'flex-start',
+  },
+  // en pantallas angostas la nota no baja de 12 px
+  notaLegible: {
+    fontSize: 12,
+  },
+  // zona de 44 px para tocar con el dedo un enlace o una casilla
+  zonaTactil: {
+    minHeight: 44,
+    justifyContent: 'center',
   },
 });
 
@@ -321,5 +352,35 @@ const styles = StyleSheet.create({
     fontFamily: fuente.normal,
     fontSize: 11,
     color: color.malva,
+  },
+  textoLegible: {
+    fontSize: 12,
+  },
+  contenidoCelular: {
+    padding: 16,
+  },
+  tarjetaCelular: {
+    paddingHorizontal: 24,
+  },
+  entradaTactil: {
+    minHeight: 44,
+  },
+  entradaConOjoTactil: {
+    paddingRight: 48,
+  },
+  ojoTactil: {
+    right: 0,
+    bottom: 0,
+    width: 44,
+    height: 44,
+  },
+  botonTactil: {
+    minHeight: 48,
+  },
+  textoBotonTactil: {
+    fontSize: 15,
+  },
+  enlaceTactil: {
+    fontSize: 13,
   },
 });

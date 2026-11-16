@@ -10,11 +10,13 @@ import {
   AccessNotice,
   AccessScreen,
   PasswordField,
+  accessStyles,
 } from '@/components/admin/AccessScreen';
 
 import { ApiError, iniciarSesion, mensajesDe } from '../api';
 import { INICIO_DEL_PORTAL, guardarSesion } from '../session';
 import { color, fuente } from '../theme';
+import { useLayout } from '../useLayout';
 
 const REVISA_TUS_DATOS = 'Revisa tu correo y contraseña para continuar.';
 const SESION_VENCIDA = 'Tu sesión venció. Inicia sesión de nuevo.';
@@ -41,6 +43,7 @@ export function LoginScreen() {
   const [contrasena, setContrasena] = useState('');
   const [recordar, setRecordar] = useState(false);
   const [entrando, setEntrando] = useState(false);
+  const { angosta } = useLayout();
   const [aviso, setAviso] = useState<string | null>(
     vencida ? SESION_VENCIDA : restablecida ? CONTRASENA_CAMBIADA : null,
   );
@@ -101,12 +104,22 @@ export function LoginScreen() {
           onPress={() => setRecordar(!recordar)}
           accessibilityRole="checkbox"
           aria-checked={recordar}
-          style={styles.recordar}
+          style={[styles.recordar, angosta ? accessStyles.zonaTactil : null]}
         >
-          <View style={[styles.casilla, recordar ? styles.casillaMarcada : null]}>
-            {recordar ? <Ionicons name="checkmark" size={11} color={color.blanco} /> : null}
+          <View
+            style={[
+              styles.casilla,
+              angosta ? styles.casillaTactil : null,
+              recordar ? styles.casillaMarcada : null,
+            ]}
+          >
+            {recordar ? (
+              <Ionicons name="checkmark" size={angosta ? 15 : 11} color={color.blanco} />
+            ) : null}
           </View>
-          <Text style={styles.textoOpcion}>Recordarme</Text>
+          <Text style={[styles.textoOpcion, angosta ? styles.textoOpcionTactil : null]}>
+            Recordarme
+          </Text>
         </Pressable>
         <AccessLink
           label="¿Olvidaste tu contraseña?"
@@ -147,5 +160,13 @@ const styles = StyleSheet.create({
     fontFamily: fuente.normal,
     fontSize: 11,
     color: color.malva,
+  },
+  casillaTactil: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+  },
+  textoOpcionTactil: {
+    fontSize: 13,
   },
 });

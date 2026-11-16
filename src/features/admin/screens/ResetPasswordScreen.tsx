@@ -12,6 +12,7 @@ import {
 } from '@/components/admin/AccessScreen';
 
 import { mensajesDe, restablecerContrasena } from '../api';
+import { useLayout } from '../useLayout';
 
 const ENLACE_INVALIDO = 'El enlace no es válido o ya venció. Solicita uno nuevo.';
 const MINIMO = 8;
@@ -26,6 +27,7 @@ export function ResetPasswordScreen() {
   const [conError, setConError] = useState(false);
   const [aviso, setAviso] = useState<string | null>(token ? null : ENLACE_INVALIDO);
   const [guardando, setGuardando] = useState(false);
+  const { celular } = useLayout();
 
   function rechazar(mensaje: string) {
     setConError(true);
@@ -74,7 +76,10 @@ export function ResetPasswordScreen() {
         accessibilityLabel="Confirmar nueva contraseña"
         value={confirmacion}
         onChangeText={alEscribir(setConfirmacion)}
-        placeholder="Ingrese nuevamente su nueva contraseña"
+        // en celular el texto de ejemplo completo no cabe en el campo
+        placeholder={
+          celular ? 'Repita su nueva contraseña' : 'Ingrese nuevamente su nueva contraseña'
+        }
         autoComplete="new-password"
         conError={conError}
         onSubmitEditing={() => void cambiar()}

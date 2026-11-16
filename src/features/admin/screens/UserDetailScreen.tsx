@@ -16,6 +16,7 @@ import { iniciales } from '../session';
 import { color, fuente } from '../theme';
 import type { UsuarioDetalle } from '../types';
 import { useData } from '../useData';
+import { useLayout } from '../useLayout';
 
 type Pestana = 'general' | 'actividad' | 'vehiculos';
 
@@ -50,10 +51,14 @@ type DatoProps = {
 
 // un dato del usuario: la etiqueta arriba y el valor abajo
 function Dato({ label, valor, tercio = false }: DatoProps) {
+  const { angosta, celular } = useLayout();
+  // en celular los datos van uno por fila, y los de tres por fila van de dos en dos
+  const ancho = celular ? (tercio ? styles.datoMitad : styles.datoCompleto) : null;
+
   return (
-    <View style={[styles.dato, tercio ? styles.datoTercio : null]}>
-      <Text style={styles.etiquetaDato}>{label}</Text>
-      <Text style={styles.valorDato}>{valor}</Text>
+    <View style={[styles.dato, tercio ? styles.datoTercio : null, ancho]}>
+      <Text style={[styles.etiquetaDato, angosta ? styles.textoLegible : null]}>{label}</Text>
+      <Text style={[styles.valorDato, celular ? styles.valorCelular : null]}>{valor}</Text>
     </View>
   );
 }
@@ -68,8 +73,10 @@ type SeccionProps = {
 
 // tarjeta con icono y título
 function Seccion({ icon, title, extra, children }: SeccionProps) {
+  const { celular } = useLayout();
+
   return (
-    <View style={[styles.tarjeta, styles.seccion]}>
+    <View style={[styles.tarjeta, styles.seccion, celular ? styles.seccionCelular : null]}>
       <View style={styles.tituloSeccion}>
         <Ionicons name={icon} size={20} color={color.texto} />
         <Text style={styles.textoTitulo}>{title}</Text>
@@ -89,6 +96,8 @@ function PersonalForm({ usuario, onSaved }: PersonalFormProps) {
   const [telefono, setTelefono] = useState(usuario.telefono ?? '');
   const [guardando, setGuardando] = useState(false);
   const [errores, setErrores] = useState<string[]>([]);
+  const { celular } = useLayout();
+  const campo = [styles.campo, celular ? styles.datoCompleto : null];
 
   async function guardar() {
     if (guardando) return;
@@ -111,13 +120,13 @@ function PersonalForm({ usuario, onSaved }: PersonalFormProps) {
     <>
       <Notice mensajes={errores} />
       <View style={styles.datos}>
-        <View style={styles.campo}>
+        <View style={campo}>
           <Field label="Nombre" value={nombre} onChangeText={setNombre} maxLength={100} />
         </View>
-        <View style={styles.campo}>
+        <View style={campo}>
           <Field label="Apellidos" value={apellidos} onChangeText={setApellidos} maxLength={150} />
         </View>
-        <View style={styles.campo}>
+        <View style={campo}>
           <Field
             label="Teléfono"
             value={telefono}
@@ -128,7 +137,7 @@ function PersonalForm({ usuario, onSaved }: PersonalFormProps) {
         </View>
         <Dato label="Correo electrónico" valor={usuario.correoInstitucional} />
       </View>
-      <View style={styles.pie}>
+      <View style={[styles.pie, celular ? styles.pieCelular : null]}>
         <PillButton
           label="Guardar cambios"
           icon="checkmark"
@@ -162,6 +171,9 @@ export function UserDetailScreen() {
   const [cambiando, setCambiando] = useState(false);
   const [erroresDeAccion, setErroresDeAccion] = useState<string[]>([]);
   const [toast, mostrarToast] = useToast();
+  const { angosta, celular } = useLayout();
+  // en pantallas angostas ningún texto baja de 12 px
+  const legible = angosta ? styles.textoLegible : null;
 
   const nombreCompleto = usuario ? `${usuario.nombre} ${usuario.apellidos}` : '';
 
@@ -186,9 +198,15 @@ export function UserDetailScreen() {
     <Screen title="Gestión > Usuarios > Detalle" subtitle="Uso del servicio" toast={toast}>
       <View style={styles.columna}>
         <Link href="/admin/usuarios" asChild>
-          <Pressable accessibilityRole="link" style={styles.volver}>
+          <Pressable
+            accessibilityRole="link"
+            // link con aschild no acepta una lista de estilos
+            style={StyleSheet.flatten([styles.volver, angosta ? styles.zonaTactil : null])}
+          >
             <Ionicons name="arrow-back" size={18} color={color.texto} />
-            <Text style={styles.textoVolver}>Volver a usuarios</Text>
+            <Text style={[styles.textoVolver, celular ? styles.textoVolverCelular : null]}>
+              Volver a usuarios
+            </Text>
           </Pressable>
         </Link>
 
@@ -198,20 +216,22 @@ export function UserDetailScreen() {
 
         {usuario ? (
           <>
-            <View style={[styles.tarjeta, styles.encabezado]}>
-              <View style={styles.avatar}>
-                <Text style={styles.iniciales}>
+            <View
+              style={[styles.tarjeta, styles.encabezado, celular ? styles.encabezadoCelular : null]}
+            >
+              <View style={[styles.avatar, celular ? styles.avatarCelular : null]}>
+                <Text style={[styles.iniciales, celular ? styles.inicialesCelular : null]}>
                   {iniciales(`${usuario.nombre.split(' ')[0]} ${usuario.apellidos}`)}
                 </Text>
               </View>
               <View style={styles.identidad}>
-                <Text style={styles.sobretitulo}>DETALLE DEL USUARIO</Text>
+                <Text style={[styles.sobretitulo, legible]}>DETALLE DEL USUARIO</Text>
                 <Text style={styles.nombre} accessibilityRole="header">
                   {nombreCompleto}
                 </Text>
               </View>
               {editando ? (
-                <View style={styles.acciones}>
+                <View style={[styles.acciones, celular ? styles.accionesCelular : null]}>
                   {usuario.activo ? (
                     <PillButton
                       label="Desactivar usuario"
@@ -229,7 +249,15 @@ export function UserDetailScreen() {
               ) : null}
             </View>
 
-            <View style={[styles.tarjeta, styles.pestanas]} accessibilityRole="tablist">
+            <View
+              style={[
+                styles.tarjeta,
+                styles.pestanas,
+                angosta ? styles.pestanasTactiles : null,
+                celular ? styles.pestanasCelular : null,
+              ]}
+              accessibilityRole="tablist"
+            >
               {PESTANAS.map((item) => (
                 <Pressable
                   key={item.id}
@@ -239,6 +267,7 @@ export function UserDetailScreen() {
                   }}
                   accessibilityRole="tab"
                   aria-selected={pestana === item.id}
+                  style={angosta ? styles.zonaTactil : undefined}
                 >
                   <Text style={[styles.pestana, pestana === item.id ? styles.pestanaActual : null]}>
                     {item.label}
@@ -270,7 +299,7 @@ export function UserDetailScreen() {
 
             {pestana === 'actividad' ? (
               <>
-                <View style={styles.cifras}>
+                <View style={[styles.cifras, celular ? styles.cifrasCelular : null]}>
                   {[
                     {
                       label: 'Viajes completados',
@@ -279,46 +308,83 @@ export function UserDetailScreen() {
                     { label: 'Como conductor', numero: usuario.actividad.comoConductor },
                     { label: 'Como pasajero', numero: usuario.actividad.comoPasajero },
                   ].map((cifra) => (
-                    <View key={cifra.label} style={[styles.tarjeta, styles.cifra]}>
+                    <View
+                      key={cifra.label}
+                      style={[styles.tarjeta, styles.cifra, celular ? styles.cifraCelular : null]}
+                    >
                       <Text style={styles.numero}>{cifra.numero}</Text>
-                      <Text style={styles.etiquetaDato}>{cifra.label}</Text>
+                      <Text style={[styles.etiquetaDato, legible]}>{cifra.label}</Text>
                     </View>
                   ))}
                 </View>
 
                 <Seccion icon="pulse-outline" title="Historial de viajes">
-                  <View style={[styles.viaje, styles.titulosViaje]}>
-                    <Text style={[styles.tituloViaje, styles.colFecha]}>Fecha</Text>
-                    <Text style={[styles.tituloViaje, styles.colRuta]}>Ruta</Text>
-                    <Text style={[styles.tituloViaje, styles.colParticipacion]}>Participación</Text>
-                    <Text style={[styles.tituloViaje, styles.colEstado]}>Estado</Text>
-                  </View>
+                  {celular ? null : (
+                    <View style={[styles.viaje, styles.titulosViaje]}>
+                      <Text style={[styles.tituloViaje, legible, styles.colFecha]}>Fecha</Text>
+                      <Text style={[styles.tituloViaje, legible, styles.colRuta]}>Ruta</Text>
+                      <Text style={[styles.tituloViaje, legible, styles.colParticipacion]}>
+                        Participación
+                      </Text>
+                      <Text style={[styles.tituloViaje, legible, styles.colEstado]}>Estado</Text>
+                    </View>
+                  )}
                   {usuario.actividad.historial.length === 0 ? (
                     <Text style={styles.vacio}>Este usuario todavía no tiene viajes.</Text>
                   ) : null}
-                  {usuario.actividad.historial.map((viaje, indice) => (
-                    <View key={indice} style={styles.viaje}>
-                      <Text style={[styles.celdaViaje, styles.colFecha]}>
-                        {aFecha(viaje.fecha)}
-                      </Text>
-                      <Text style={[styles.celdaViaje, styles.colRuta]}>
-                        {viaje.origen} → {viaje.destino}
-                      </Text>
-                      <Text style={[styles.celdaViaje, styles.colParticipacion]}>
-                        {viaje.participacion}
-                      </Text>
-                      <View style={styles.colEstado}>
-                        <View
-                          style={[
-                            styles.estadoViaje,
-                            { backgroundColor: colorDeEstado(viaje.estadoCodigo) },
-                          ]}
-                        >
-                          <Text style={styles.textoEstadoViaje}>{viaje.estado}</Text>
+                  {celular ? (
+                    // en celular cada viaje es un renglón, con la fecha y el estado arriba
+                    <View>
+                      {usuario.actividad.historial.map((viaje, indice) => (
+                        <View key={indice} style={styles.viajeCelular}>
+                          <View style={styles.cabeceraViaje}>
+                            <Text style={styles.fechaViaje}>{aFecha(viaje.fecha)}</Text>
+                            <View
+                              style={[
+                                styles.estadoViaje,
+                                styles.estadoViajeCelular,
+                                { backgroundColor: colorDeEstado(viaje.estadoCodigo) },
+                              ]}
+                            >
+                              <Text style={[styles.textoEstadoViaje, styles.textoLegible]}>
+                                {viaje.estado}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={styles.rutaViaje}>
+                            {viaje.origen} → {viaje.destino}
+                          </Text>
+                          <Text style={[styles.etiquetaDato, styles.textoLegible]}>
+                            {viaje.participacion}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    usuario.actividad.historial.map((viaje, indice) => (
+                      <View key={indice} style={styles.viaje}>
+                        <Text style={[styles.celdaViaje, styles.colFecha]}>
+                          {aFecha(viaje.fecha)}
+                        </Text>
+                        <Text style={[styles.celdaViaje, styles.colRuta]}>
+                          {viaje.origen} → {viaje.destino}
+                        </Text>
+                        <Text style={[styles.celdaViaje, styles.colParticipacion]}>
+                          {viaje.participacion}
+                        </Text>
+                        <View style={styles.colEstado}>
+                          <View
+                            style={[
+                              styles.estadoViaje,
+                              { backgroundColor: colorDeEstado(viaje.estadoCodigo) },
+                            ]}
+                          >
+                            <Text style={[styles.textoEstadoViaje, legible]}>{viaje.estado}</Text>
+                          </View>
                         </View>
                       </View>
-                    </View>
-                  ))}
+                    ))
+                  )}
                 </Seccion>
               </>
             ) : null}
@@ -347,26 +413,31 @@ export function UserDetailScreen() {
                         tercio
                       />
                       {/* espacio vacío para que la segunda fila quede alineada */}
-                      <View style={styles.datoTercio} />
+                      <View style={[styles.datoTercio, celular ? styles.datoMitad : null]} />
                     </View>
                   </Seccion>
                 ))
               : null}
 
-            <View style={[styles.tarjeta, styles.resumen]}>
+            <View style={[styles.tarjeta, styles.resumen, celular ? styles.resumenCelular : null]}>
               <Ionicons name="home-outline" size={24} color={color.texto} />
               <View style={styles.datoResumen}>
-                <Text style={styles.etiquetaDato}>Institución</Text>
-                <Text style={styles.valorResumen}>{usuario.institucion}</Text>
+                <Text style={[styles.etiquetaDato, legible]}>Institución</Text>
+                <Text style={[styles.valorResumen, celular ? styles.valorCelular : null]}>
+                  {usuario.institucion}
+                </Text>
               </View>
-              <View style={styles.datoResumen}>
-                <Text style={styles.etiquetaDato}>Estado de la cuenta</Text>
-                <Text style={styles.valorResumen}>{usuario.activo ? 'Activo' : 'Inactivo'}</Text>
+              {/* en celular el segundo dato baja de fila y se alinea con el primero */}
+              <View style={[styles.datoResumen, celular ? styles.datoBajoIcono : null]}>
+                <Text style={[styles.etiquetaDato, legible]}>Estado de la cuenta</Text>
+                <Text style={[styles.valorResumen, celular ? styles.valorCelular : null]}>
+                  {usuario.activo ? 'Activo' : 'Inactivo'}
+                </Text>
               </View>
             </View>
 
             {pestana === 'general' ? (
-              <View style={styles.pie}>
+              <View style={[styles.pie, celular ? styles.pieCelular : null]}>
                 {editando ? (
                   <PillButton
                     label="Salir"
@@ -396,12 +467,14 @@ export function UserDetailScreen() {
             <>
               <PillButton
                 label="Aceptar"
+                expandido
                 onPress={() => void cambiarEstado(false)}
                 ocupado={cambiando}
               />
               <PillButton
                 label="Cancelar"
                 tono="gris"
+                expandido
                 onPress={() => setConfirmando(false)}
                 disabled={cambiando}
               />
@@ -649,5 +722,101 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     color: color.textoSuave,
+  },
+  // zona de 44 px para tocar con el dedo un enlace o una pestaña
+  zonaTactil: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  // en pantallas angostas ningún texto baja de 12 px
+  textoLegible: {
+    fontSize: 12,
+  },
+  textoVolverCelular: {
+    fontSize: 13,
+  },
+  encabezadoCelular: {
+    gap: 16,
+    paddingHorizontal: 16,
+  },
+  avatarCelular: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+  },
+  inicialesCelular: {
+    fontSize: 24,
+  },
+  accionesCelular: {
+    flexBasis: '100%',
+    flexDirection: 'column',
+    flexWrap: 'nowrap',
+  },
+  pestanasTactiles: {
+    paddingVertical: 2,
+  },
+  pestanasCelular: {
+    justifyContent: 'space-between',
+    columnGap: 8,
+    paddingHorizontal: 16,
+  },
+  seccionCelular: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  datoCompleto: {
+    width: '100%',
+  },
+  datoMitad: {
+    width: '47%',
+  },
+  valorCelular: {
+    fontSize: 14,
+  },
+  cifrasCelular: {
+    flexWrap: 'nowrap',
+    gap: 10,
+  },
+  cifraCelular: {
+    flexBasis: 0,
+    paddingHorizontal: 12,
+  },
+  viajeCelular: {
+    gap: 2,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: color.linea,
+  },
+  cabeceraViaje: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  fechaViaje: {
+    fontFamily: fuente.negrita,
+    fontSize: 13,
+    color: color.texto,
+  },
+  estadoViajeCelular: {
+    minWidth: 96,
+  },
+  rutaViaje: {
+    fontFamily: fuente.normal,
+    fontSize: 14,
+    color: color.texto,
+  },
+  resumenCelular: {
+    alignItems: 'flex-start',
+    gap: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  // el ancho del icono más el espacio que lo separa del primer dato
+  datoBajoIcono: {
+    marginLeft: 40,
+  },
+  pieCelular: {
+    flexDirection: 'column',
   },
 });

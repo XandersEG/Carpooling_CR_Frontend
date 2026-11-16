@@ -29,5 +29,8 @@ export const fuente = {
   negrita: 'Cairo_700Bold',
 } as const;
 
-// ancho desde el que la barra lateral muestra también los textos
+// ancho desde el que la barra lateral queda fija; por debajo se guarda en un cajón
 export const ANCHO_BARRA_COMPLETA = 900;
+
+// ancho bajo el que las tablas se muestran como tarjetas, pensado para celular
+export const ANCHO_TABLAS = 700;

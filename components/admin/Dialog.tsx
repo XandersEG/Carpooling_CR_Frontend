@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps, ReactNode } from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { color, fuente } from '@/src/features/admin/theme';
 
@@ -16,7 +16,7 @@ type Props = {
   errores?: string[];
 };
 
-// diálogo del portal: encabezado oscuro, contenido y botones.  
+// diálogo del portal: encabezado oscuro, contenido que se desplaza si no cabe y botones.  
 export function Dialog({
   title,
   icon = 'options-outline',
@@ -35,7 +35,7 @@ export function Dialog({
               {title}
             </Text>
           </View>
-          <View style={styles.cuerpo}>
+          <ScrollView contentContainerStyle={styles.cuerpo}>
             {errores.length > 0 ? (
               <View style={styles.error}>
                 {errores.map((mensaje) => (
@@ -46,7 +46,7 @@ export function Dialog({
               </View>
             ) : null}
             {children}
-          </View>
+          </ScrollView>
           <View style={styles.pie}>{footer}</View>
         </View>
       </View>
@@ -65,6 +65,7 @@ const styles = StyleSheet.create({
   tarjeta: {
     width: '100%',
     maxWidth: 440,
+    maxHeight: '100%',
     backgroundColor: color.blanco,
     borderRadius: 22,
     overflow: 'hidden',

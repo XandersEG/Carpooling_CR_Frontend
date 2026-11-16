@@ -24,6 +24,7 @@ import {
 import { color, fuente } from '../theme';
 import type { Administrador } from '../types';
 import { useData } from '../useData';
+import { useLayout } from '../useLayout';
 
 // tiempo que se espera sin escribir antes de buscar
 const ESPERA_MS = 300;
@@ -80,9 +81,16 @@ function AdministratorDialog({ administrador, onClose, onSaved }: AdministratorD
       errores={errores}
       footer={
         <>
-          <PillButton label="Cancelar" tono="gris" onPress={onClose} disabled={guardando} />
+          <PillButton
+            label="Cancelar"
+            tono="gris"
+            expandido
+            onPress={onClose}
+            disabled={guardando}
+          />
           <PillButton
             label={administrador ? 'Guardar cambios' : 'Registrar'}
+            expandido
             onPress={() => void guardar()}
             ocupado={guardando}
           />
@@ -128,8 +136,9 @@ type AdministratorsAreaProps = {
   onSaved: (mensaje: string) => void;
 };
 
-// área de administradores: la lista, el registro, la edición y activar o desactivar.  
+// área de administradores: lista, registro, edición y estado. en celular cada uno es una tarjeta.  
 function AdministratorsArea({ onSaved }: AdministratorsAreaProps) {
+  const { angosta, celular } = useLayout();
   const { datos, cargando, errores, recargar } = useData(listarAdministradores, []);
   const [dialogo, setDialogo] = useState<{ administrador?: Administrador } | null>(null);
   // id del administrador que se está activando o desactivando
@@ -154,9 +163,19 @@ function AdministratorsArea({ onSaved }: AdministratorsAreaProps) {
     }
   }
 
+  // texto que ocupa el lugar de la lista mientras carga o si está vacía
+  const aviso =
+    datos === undefined
+      ? cargando
+        ? 'Cargando…'
+        : null
+      : administradores.length === 0
+        ? 'Todavía no hay administradores registrados.'
+        : null;
+
   return (
     <View style={styles.administradores}>
-      <View style={styles.encabezado}>
+      <View style={[styles.encabezado, celular ? styles.encabezadoCelular : null]}>
         <Text style={styles.subtitulo} accessibilityRole="header">
           Administradores
         </Text>
@@ -171,55 +190,87 @@ function AdministratorsArea({ onSaved }: AdministratorsAreaProps) {
       <Notice mensajes={errores} onRetry={recargar} />
       <Notice mensajes={erroresDeAccion} />
 
-      <View style={styles.tabla}>
-        <View style={styles.fila}>
-          <Text style={[styles.titulo, styles.colNombre]}>Nombre</Text>
-          <View style={styles.colCorreo}>
-            <Text style={styles.titulo}>Correo</Text>
-          </View>
-          <View style={styles.colFija}>
-            <Text style={styles.titulo}>Estado</Text>
-          </View>
-          <View style={styles.colAcciones}>
-            <Text style={styles.titulo}>Acciones</Text>
-          </View>
-        </View>
-
-        {cargando && datos === undefined ? <Text style={styles.vacio}>Cargando…</Text> : null}
-        {datos !== undefined && administradores.length === 0 ? (
-          <Text style={styles.vacio}>Todavía no hay administradores registrados.</Text>
-        ) : null}
-        {administradores.map((administrador) => (
-          <View key={administrador.id} style={styles.fila}>
-            <Text style={[styles.celda, styles.colNombre]} numberOfLines={1}>
-              {administrador.nombre}
-            </Text>
+      {celular ? (
+        <>
+          {aviso ? (
+            <View style={styles.ficha}>
+              <Text style={styles.vacio}>{aviso}</Text>
+            </View>
+          ) : null}
+          {administradores.map((administrador) => (
+            <View key={administrador.id} style={styles.ficha}>
+              <View style={styles.cabeceraFicha}>
+                <Text style={styles.nombreFicha}>{administrador.nombre}</Text>
+                <StatusPill activo={administrador.activo} lleno />
+              </View>
+              <Text style={styles.correoFicha}>{administrador.correo}</Text>
+              <View style={styles.botones}>
+                <PillButton
+                  label="Editar"
+                  tono="malva"
+                  expandido
+                  onPress={() => setDialogo({ administrador })}
+                />
+                <PillButton
+                  label={administrador.activo ? 'Desactivar' : 'Activar'}
+                  tono={administrador.activo ? 'terracota' : 'verde'}
+                  expandido
+                  onPress={() => void cambiarEstado(administrador)}
+                  ocupado={cambiando === administrador.id}
+                />
+              </View>
+            </View>
+          ))}
+        </>
+      ) : (
+        <View style={styles.tabla}>
+          <View style={styles.fila}>
+            <Text style={[styles.titulo, styles.colNombre]}>Nombre</Text>
             <View style={styles.colCorreo}>
-              <Text style={styles.celda} numberOfLines={1}>
-                {administrador.correo}
-              </Text>
+              <Text style={styles.titulo}>Correo</Text>
             </View>
             <View style={styles.colFija}>
-              <StatusPill activo={administrador.activo} lleno />
+              <Text style={styles.titulo}>Estado</Text>
             </View>
             <View style={styles.colAcciones}>
-              <PillButton
-                label="Editar"
-                tono="malva"
-                pequeno
-                onPress={() => setDialogo({ administrador })}
-              />
-              <PillButton
-                label={administrador.activo ? 'Desactivar' : 'Activar'}
-                tono={administrador.activo ? 'terracota' : 'verde'}
-                pequeno
-                onPress={() => void cambiarEstado(administrador)}
-                ocupado={cambiando === administrador.id}
-              />
+              <Text style={styles.titulo}>Acciones</Text>
             </View>
           </View>
-        ))}
-      </View>
+
+          {aviso ? <Text style={styles.vacio}>{aviso}</Text> : null}
+          {administradores.map((administrador) => (
+            <View key={administrador.id} style={styles.fila}>
+              <Text style={[styles.celda, styles.colNombre]} numberOfLines={1}>
+                {administrador.nombre}
+              </Text>
+              <View style={styles.colCorreo}>
+                {/* en tablet el correo baja de línea en vez de cortarse */}
+                <Text style={styles.celda} numberOfLines={angosta ? undefined : 1}>
+                  {administrador.correo}
+                </Text>
+              </View>
+              <View style={styles.colFija}>
+                <StatusPill activo={administrador.activo} lleno />
+              </View>
+              <View style={styles.colAcciones}>
+                <PillButton
+                  label="Editar"
+                  tono="malva"
+                  pequeno
+                  onPress={() => setDialogo({ administrador })}
+                />
+                <PillButton
+                  label={administrador.activo ? 'Desactivar' : 'Activar'}
+                  tono={administrador.activo ? 'terracota' : 'verde'}
+                  pequeno
+                  onPress={() => void cambiarEstado(administrador)}
+                  ocupado={cambiando === administrador.id}
+                />
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
 
       <Text style={styles.total}>
         {datos !== undefined
@@ -242,9 +293,10 @@ function AdministratorsArea({ onSaved }: AdministratorsAreaProps) {
   );
 }
 
-// sección de usuarios: listado con búsqueda y filtros, y el área de administradores.  
+// sección de usuarios: listado con búsqueda y filtros (una lista en celular) y administradores.  
 export function UsersScreen() {
   const router = useRouter();
+  const { angosta, celular } = useLayout();
   const [buscar, setBuscar] = useState('');
   // texto que ya se envió al servidor
   const [busqueda, setBusqueda] = useState('');
@@ -275,11 +327,22 @@ export function UsersScreen() {
   const total = usuarios.datos?.total ?? 0;
   const paginas = Math.max(1, Math.ceil(total / USUARIOS_POR_PAGINA));
   const conFiltros = busqueda !== '' || institucionId !== '';
+  // texto que ocupa el lugar del listado mientras carga o si no hay resultados
+  const aviso =
+    usuarios.datos === undefined
+      ? usuarios.cargando
+        ? 'Cargando…'
+        : null
+      : filas.length === 0
+        ? conFiltros
+          ? 'Ningún usuario coincide con la búsqueda.'
+          : 'Todavía no hay usuarios registrados.'
+        : null;
 
   return (
     <Screen title="Gestión > Usuarios" subtitle="Uso del servicio" toast={toast}>
       <View style={styles.columna}>
-        <View style={styles.buscador}>
+        <View style={[styles.buscador, angosta ? styles.buscadorTactil : null]}>
           <Ionicons name="search-outline" size={18} color={color.texto} />
           <TextInput
             value={buscar}
@@ -288,7 +351,7 @@ export function UsersScreen() {
             placeholderTextColor={color.textoSuave}
             accessibilityLabel="Buscar usuario por nombre o correo"
             maxLength={100}
-            style={styles.entradaBuscar}
+            style={[styles.entradaBuscar, angosta ? styles.entradaTactil : null]}
           />
         </View>
 
@@ -307,39 +370,26 @@ export function UsersScreen() {
             setPagina(1);
           }}
           blanco
-          ancho={250}
+          ancho={celular ? '100%' : 250}
         />
 
         <Notice mensajes={instituciones.errores} onRetry={instituciones.recargar} />
         <Notice mensajes={usuarios.errores} onRetry={usuarios.recargar} />
 
-        <View style={styles.tabla}>
-          <View style={styles.fila}>
-            <Text style={[styles.titulo, styles.colNombre]}>Nombre</Text>
-            <View style={styles.colFija}>
-              <Text style={styles.titulo}>Detalle</Text>
-            </View>
-            <View style={styles.colFija}>
-              <Text style={styles.titulo}>Estado</Text>
-            </View>
-          </View>
-
-          {usuarios.cargando && usuarios.datos === undefined ? (
-            <Text style={styles.vacio}>Cargando…</Text>
-          ) : null}
-          {usuarios.datos !== undefined && filas.length === 0 ? (
-            <Text style={styles.vacio}>
-              {conFiltros
-                ? 'Ningún usuario coincide con la búsqueda.'
-                : 'Todavía no hay usuarios registrados.'}
-            </Text>
-          ) : null}
-          {filas.map((usuario) => (
-            <View key={usuario.id} style={styles.fila}>
-              <Text style={[styles.celda, styles.colNombre]} numberOfLines={1}>
-                {usuario.nombre} {usuario.apellidos}
-              </Text>
-              <View style={styles.colFija}>
+        {celular ? (
+          <View style={styles.lista}>
+            {aviso ? <Text style={styles.vacio}>{aviso}</Text> : null}
+            {filas.map((usuario, indice) => (
+              <View
+                key={usuario.id}
+                style={[styles.filaLista, indice > 0 ? styles.filaSeparada : null]}
+              >
+                <View style={styles.datosLista}>
+                  <Text style={styles.nombreLista}>
+                    {usuario.nombre} {usuario.apellidos}
+                  </Text>
+                  <StatusPill activo={usuario.activo} lleno />
+                </View>
                 <PillButton
                   label="Ver detalle"
                   tono="malva"
@@ -347,12 +397,41 @@ export function UsersScreen() {
                   onPress={() => router.push(`/admin/usuarios/${usuario.id}`)}
                 />
               </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.tabla}>
+            <View style={styles.fila}>
+              <Text style={[styles.titulo, styles.colNombre]}>Nombre</Text>
               <View style={styles.colFija}>
-                <StatusPill activo={usuario.activo} lleno />
+                <Text style={styles.titulo}>Detalle</Text>
+              </View>
+              <View style={styles.colFija}>
+                <Text style={styles.titulo}>Estado</Text>
               </View>
             </View>
-          ))}
-        </View>
+
+            {aviso ? <Text style={styles.vacio}>{aviso}</Text> : null}
+            {filas.map((usuario) => (
+              <View key={usuario.id} style={styles.fila}>
+                <Text style={[styles.celda, styles.colNombre]} numberOfLines={1}>
+                  {usuario.nombre} {usuario.apellidos}
+                </Text>
+                <View style={styles.colFija}>
+                  <PillButton
+                    label="Ver detalle"
+                    tono="malva"
+                    pequeno
+                    onPress={() => router.push(`/admin/usuarios/${usuario.id}`)}
+                  />
+                </View>
+                <View style={styles.colFija}>
+                  <StatusPill activo={usuario.activo} lleno />
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
 
         <View style={styles.pie}>
           <Text style={styles.total}>
@@ -366,7 +445,11 @@ export function UsersScreen() {
               disabled={pagina <= 1}
               accessibilityRole="button"
               accessibilityLabel="Página anterior"
-              style={[styles.flecha, pagina <= 1 ? styles.flechaApagada : null]}
+              style={[
+                styles.flecha,
+                angosta ? styles.flechaTactil : null,
+                pagina <= 1 ? styles.flechaApagada : null,
+              ]}
             >
               <Ionicons name="chevron-back" size={18} color={color.texto} />
             </Pressable>
@@ -375,7 +458,11 @@ export function UsersScreen() {
               disabled={pagina >= paginas}
               accessibilityRole="button"
               accessibilityLabel="Página siguiente"
-              style={[styles.flecha, pagina >= paginas ? styles.flechaApagada : null]}
+              style={[
+                styles.flecha,
+                angosta ? styles.flechaTactil : null,
+                pagina >= paginas ? styles.flechaApagada : null,
+              ]}
             >
               <Ionicons name="chevron-forward" size={18} color={color.texto} />
             </Pressable>
@@ -512,5 +599,73 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderLeftWidth: 1,
     borderLeftColor: color.grisOscuro,
+  },
+  buscadorTactil: {
+    minHeight: 44,
+  },
+  entradaTactil: {
+    minHeight: 44,
+    fontSize: 16,
+  },
+  flechaTactil: {
+    height: 44,
+  },
+  lista: {
+    backgroundColor: color.blanco,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  filaLista: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  filaSeparada: {
+    borderTopWidth: 1,
+    borderTopColor: color.linea,
+  },
+  datosLista: {
+    flex: 1,
+    alignItems: 'flex-start',
+    gap: 4,
+  },
+  nombreLista: {
+    fontFamily: fuente.media,
+    fontSize: 14,
+    color: color.texto,
+  },
+  encabezadoCelular: {
+    flexDirection: 'column',
+    flexWrap: 'nowrap',
+    alignItems: 'stretch',
+  },
+  ficha: {
+    gap: 6,
+    padding: 16,
+    backgroundColor: color.blanco,
+    borderRadius: 14,
+  },
+  cabeceraFicha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  nombreFicha: {
+    flex: 1,
+    fontFamily: fuente.negrita,
+    fontSize: 15,
+    color: color.texto,
+  },
+  correoFicha: {
+    fontFamily: fuente.normal,
+    fontSize: 13,
+    color: color.texto,
+  },
+  botones: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
   },
 });

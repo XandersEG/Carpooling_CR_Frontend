@@ -39,8 +39,10 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 24,
     alignItems: 'center',
+    paddingHorizontal: 16,
   },
   aviso: {
+    maxWidth: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -58,6 +60,7 @@ const styles = StyleSheet.create({
     backgroundColor: color.verde,
   },
   texto: {
+    flexShrink: 1,
     fontFamily: fuente.normal,
     fontSize: 13,
     color: color.texto,
