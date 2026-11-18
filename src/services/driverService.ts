@@ -6,14 +6,13 @@
  * `EXPO_PUBLIC_USE_MOCKS=false`. Provisional: lo demás sigue simulado.
  */
 import type { Id } from '@/src/types/common';
-import type { DriverTrip, IncomingRequest, PublishTripInput, TripStatus, TripStop } from '@/src/types/trip';
+import type { DriverTrip, IncomingRequest, IncomingRequestStatus, PublishTripInput, TripStatus, TripStop, } from '@/src/types/trip';
 import { now } from '@/src/utils/clock';
 
 import { apiRequest } from './apiClient';
 import { USE_MOCK_DATA } from './config';
 import { db } from './mock/db';
-import { createId, notFound, respond } from './mock/utils';
-
+import { createId, delay, notFound, respond } from './mock/utils';
 type ApiPlace = { nombre: string; lat: number; lng: number };
 
 /** Respuesta de `/driver/trips/:id`. */
@@ -147,31 +146,91 @@ export async function publishTrip(input: PublishTripInput): Promise<DriverTrip> 
   return respond(trip);
 }
 
-export async function getIncomingRequests(): Promise<IncomingRequest[]> {
-  return respond(db.incomingRequests);
+/** Solicitud como la devuelve `GET /driver/requests`. */
+type IncomingRequestResponse = {
+  id: number;
+  estado: 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA';
+  pasajero: { id: number; nombre: string; fotoUrl: string | null };
+  puntoRecogida: ApiPlace;
+  viaje: {
+    id: number;
+    origen: { nombre: string };
+    destino: { nombre: string };
+    salida: string;
+    costo: number;
+  };
+};
+
+const REQUEST_STATUS_FROM_API: Record<IncomingRequestResponse['estado'], IncomingRequestStatus> = {
+  PENDIENTE: 'pendiente',
+  ACEPTADA: 'aceptada',
+  RECHAZADA: 'rechazada',
+};
+
+function toIncomingRequest(response: IncomingRequestResponse): IncomingRequest {
+  return {
+    id: String(response.id),
+    tripId: String(response.viaje.id),
+    passenger: {
+      id: String(response.pasajero.id),
+      fullName: response.pasajero.nombre,
+      avatarUrl: response.pasajero.fotoUrl ?? undefined,
+    },
+    pickupPoint: { name: response.puntoRecogida.nombre },
+    origin: { name: response.viaje.origen.nombre },
+    destination: { name: response.viaje.destino.nombre },
+    departureAt: response.viaje.salida,
+    amount: response.viaje.costo,
+    status: REQUEST_STATUS_FROM_API[response.estado],
+  };
 }
 
+/** Solicitudes pendientes y aceptadas de los viajes programados del conductor. */
+export async function getIncomingRequests(): Promise<IncomingRequest[]> {
+  if (!USE_MOCK_DATA) {
+    const response = await apiRequest<IncomingRequestResponse[]>('/driver/requests');
+    return response.map(toIncomingRequest);
+  }
+  return respond(db.incomingRequests.filter((request) => request.status !== 'rechazada'));
+}
+
+/** Acepta o rechaza una solicitud. Devuelve su nuevo estado. */
 export async function respondToRequest(
   id: Id,
   decision: 'aceptada' | 'rechazada',
-): Promise<IncomingRequest> {
-  const request = db.incomingRequests.find((item) => item.id === id);
-  if (!request) throw notFound('Solicitud', id);
-  request.status = decision;
-
-  // Al aceptar, los pasajeros de la solicitud se agregan al viaje (sin duplicarlos).
-  const trip = request.tripId ? db.driverTrips.find((item) => item.id === request.tripId) : undefined;
-  if (decision === 'aceptada' && trip) {
-    for (const passenger of request.passengers) {
-      const alreadyAdded = trip.passengers.some((item) => item.passenger.id === passenger.passenger.id);
-      if (!alreadyAdded && trip.availableSeats > 0) {
-        trip.passengers.push({ ...passenger, status: 'aprobada' });
-        trip.availableSeats -= 1;
-      }
-    }
+): Promise<IncomingRequestStatus> {
+  if (!USE_MOCK_DATA) {
+    const action = decision === 'aceptada' ? 'accept' : 'reject';
+    const response = await apiRequest<{ estado: IncomingRequestResponse['estado'] }>(
+      `/driver/requests/${encodeURIComponent(id)}/${action}`,
+      { method: 'POST' },
+    );
+    return REQUEST_STATUS_FROM_API[response.estado];
   }
 
-  return respond(request);
+  // Simulado con las mismas reglas que el Backend.
+  const request = db.incomingRequests.find((item) => item.id === id);
+  if (!request) throw new Error('La solicitud no existe.');
+  if (request.status !== 'pendiente') throw new Error('La solicitud ya fue respondida.');
+
+  const trip = db.driverTrips.find((item) => item.id === request.tripId);
+  if (decision === 'aceptada' && trip) {
+    if (trip.availableSeats <= 0) throw new Error('El viaje ya no tiene cupos disponibles.');
+    trip.passengers.push({
+      id: request.id,
+      tripId: request.tripId,
+      passenger: request.passenger,
+      pickupPoint: request.pickupPoint,
+      amount: request.amount,
+      paymentMethod: trip.paymentMethod,
+      status: 'aprobada',
+    });
+    trip.availableSeats -= 1;
+  }
+
+  request.status = decision;
+  await delay();
+  return decision;
 }
 
 /** Viajes publicados por el conductor (el más reciente primero). */

@@ -4,10 +4,9 @@ import { DetailDivider, DetailRow } from '@/components/mobile/Detail';
 import { DestinationSquare, OriginDot, RouteVertical } from '@/components/mobile/Route';
 import { colors, palette, radius, shadows, spacing, typography } from '@/src/constants/theme';
 import type { IncomingRequest } from '@/src/types/trip';
-import { formatDayMonth, formatTime } from '@/src/utils/format';
+import { formatCost, formatDayMonth, formatTime } from '@/src/utils/format';
 
 import { IconAceptar, IconRechazar } from './icons';
-import { PassengersEarningsCard } from './PassengersEarningsCard';
 
 type RequestCardProps = {
   request: IncomingRequest;
@@ -19,21 +18,21 @@ type RequestCardProps = {
 };
 
 /**
- * Tarjeta de "Solicitudes" (2726:6159…6996). Contraída muestra la mini ruta y
- * los botones ✕ / ✓; expandida muestra fecha, horas y los pasajeros. Aceptada se
- * rellena de verde y solo conserva ✕.
+ * Tarjeta de "Solicitudes" (2726:6159…6996): un pasajero que pide unirse a un
+ * viaje. Contraída muestra el pasajero, la mini ruta y los botones ✕ / ✓;
+ * expandida agrega fecha, hora, punto de recogida y aporte. Aceptada se rellena
+ * de verde y solo conserva ✕.
  */
 export function RequestCard({ request, expanded, busy = false, onToggle, onAccept, onReject }: RequestCardProps) {
   const accepted = request.status === 'aceptada';
-  const hasDetail = Boolean(request.departureAt) || request.passengers.length > 0;
-  const showExpanded = expanded && hasDetail;
   const route = `${request.origin.name} a ${request.destination.name}`;
+  const label = `Solicitud de ${request.passenger.fullName}, ${route}`;
 
   const actions = (
     <View style={styles.actions}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Rechazar solicitud de ${route}`}
+        accessibilityLabel={`Rechazar ${label}`}
         disabled={busy}
         hitSlop={6}
         onPress={onReject}
@@ -44,7 +43,7 @@ export function RequestCard({ request, expanded, busy = false, onToggle, onAccep
       {!accepted ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Aceptar solicitud de ${route}`}
+          accessibilityLabel={`Aceptar ${label}`}
           disabled={busy}
           hitSlop={6}
           onPress={onAccept}
@@ -56,37 +55,40 @@ export function RequestCard({ request, expanded, busy = false, onToggle, onAccep
     </View>
   );
 
+  // Los botones ✕ / ✓ quedan fuera de las zonas que abren y cierran la tarjeta: en web
+  // un <button> dentro de otro <button> es HTML inválido.
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ expanded: showExpanded }}
-      accessibilityLabel={`Solicitud de ${route}${accepted ? ', aceptada' : ''}`}
-      disabled={!hasDetail}
-      onPress={onToggle}
-      style={[
-        showExpanded ? styles.expandedCard : styles.card,
-        accepted ? styles.accepted : null,
-      ]}
-    >
-      {showExpanded ? (
-        <>
-          <View style={styles.row}>
-            <RouteVertical origin={request.origin.name} destination={request.destination.name} style={styles.flex} />
-            {actions}
-          </View>
+    <View style={[expanded ? styles.expandedCard : styles.card, accepted ? styles.accepted : null]}>
+      <View style={styles.row}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          accessibilityLabel={`${label}${accepted ? ', aceptada' : ''}`}
+          onPress={onToggle}
+          style={styles.summary}
+        >
+          <Text style={styles.passenger} numberOfLines={1}>
+            {request.passenger.fullName}
+          </Text>
+          {expanded ? (
+            <RouteVertical origin={request.origin.name} destination={request.destination.name} />
+          ) : (
+            <MiniRoute origin={request.origin.name} destination={request.destination.name} />
+          )}
+        </Pressable>
+        {actions}
+      </View>
+
+      {expanded ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Ocultar detalle" onPress={onToggle} style={styles.details}>
           <DetailDivider />
-          {request.departureAt ? <DetailRow label="Fecha" value={formatDayMonth(request.departureAt)} /> : null}
-          {request.departureAt ? <DetailRow label="Hora de salida" value={formatTime(request.departureAt)} /> : null}
-          {request.arrivalAt ? <DetailRow label="Hora de llegada" value={formatTime(request.arrivalAt)} /> : null}
-          {request.passengers.length > 0 ? <PassengersEarningsCard passengers={request.passengers} /> : null}
-        </>
-      ) : (
-        <View style={styles.row}>
-          <MiniRoute origin={request.origin.name} destination={request.destination.name} />
-          {actions}
-        </View>
-      )}
-    </Pressable>
+          <DetailRow label="Fecha" value={formatDayMonth(request.departureAt)} />
+          <DetailRow label="Hora de salida" value={formatTime(request.departureAt)} />
+          <DetailRow label="Punto de recogida" value={request.pickupPoint.name} />
+          <DetailRow label="Aporte" value={formatCost(request.amount)} />
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -140,8 +142,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.m,
   },
-  flex: {
+  summary: {
     flex: 1,
+    gap: spacing.xs,
+  },
+  passenger: {
+    ...typography.nameCard,
+    color: colors.textTitle,
+  },
+  details: {
+    gap: spacing.xxs,
   },
   actions: {
     marginLeft: 'auto',
@@ -153,7 +163,6 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   mini: {
-    flex: 1,
     maxWidth: 200,
     gap: 4,
   },
