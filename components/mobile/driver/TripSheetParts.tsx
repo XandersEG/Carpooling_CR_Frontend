@@ -53,7 +53,7 @@ export function StopsTimeline({ stops }: { stops: TripStop[] }) {
               {stopDetail(stop)}
             </Text>
           </View>
-          <Text style={styles.stopTime}>{formatTime(stop.time)}</Text>
+          {stop.time ? <Text style={styles.stopTime}>{formatTime(stop.time)}</Text> : null}
         </View>
       ))}
     </View>

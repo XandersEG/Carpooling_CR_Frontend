@@ -1,11 +1,13 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/mobile/driver/ConfirmDialog';
 import { IconBandera, IconCancelar, IconEnviar } from '@/components/mobile/driver/icons';
 import { DriverTripMap } from '@/components/mobile/driver/RouteMaps';
 import { PassengerRow, StopsTimeline } from '@/components/mobile/driver/TripSheetParts';
+import { LoadState } from '@/components/mobile/passenger/LoadState';
+import { useServiceData } from '@/components/mobile/passenger/useServiceData';
 import { Screen } from '@/components/mobile/Screen';
 import { ScreenHeader } from '@/components/mobile/ScreenHeader';
 import { SegmentedControl } from '@/components/mobile/SegmentedControl';
@@ -17,10 +19,14 @@ import type { DriverTrip } from '@/src/types/trip';
 
 /** Fondo de la barra de botones del viaje ("Botones viaje" 2642:3974); sin token en Figma. */
 const ACTION_BAR_BACKGROUND = '#FBFAF8';
+/** Colores de "Iniciar viaje" en la barra de botones; sin token en Figma. */
+const START_BUTTON_BACKGROUND = '#B2D258';
+const START_BUTTON_TEXT = '#2D3A14';
 /** Alto máximo de la lista de pasajeros/paradas dentro de la hoja inferior. */
 const SHEET_LIST_MAX_HEIGHT = 190;
 
 type Tab = 'pasajeros' | 'paradas';
+type TripAction = 'start' | 'finish' | 'cancel';
 
 function cancelMessage(passengers: number): string {
   if (passengers === 0) return 'El viaje se cerrará. Esta acción no se puede deshacer.';
@@ -34,63 +40,72 @@ function cancelMessage(passengers: number): string {
  */
 export default function DriverTripScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [trip, setTrip] = useState<DriverTrip | null>(null);
+  const { data, loading, error } = useServiceData(() => getDriverTrip(id), [id]);
+  const [updatedTrip, setUpdatedTrip] = useState<DriverTrip | null>(null);
   const [tab, setTab] = useState<Tab>('pasajeros');
   const [confirmCancel, setConfirmCancel] = useState(false);
-  const [busy, setBusy] = useState<'start' | 'finish' | 'cancel' | null>(null);
+  const [busy, setBusy] = useState<TripAction | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    getDriverTrip(id).then((data) => {
-      if (!active) return;
-      if (data.status === 'finalizado') router.replace(`/viaje-conductor/${id}/finalizado`);
-      else if (data.status === 'cancelado') router.replace(`/viaje-conductor/${id}/cancelado`);
-      else setTrip(data);
-    });
-    return () => {
-      active = false;
-    };
-  }, [id]);
+  const trip = updatedTrip?.id === id ? updatedTrip : data;
 
-  const start = async () => {
-    setBusy('start');
+  const runAction = async (action: TripAction, task: () => Promise<void>) => {
+    setBusy(action);
+    setActionError(null);
     try {
-      setTrip(await startTrip(id));
+      await task();
+    } catch (reason) {
+      setActionError(reason instanceof Error ? reason.message : 'No se pudo completar la acción.');
+      // El viaje pudo cambiar en otro dispositivo: se muestra su estado actual.
+      // Se espera aquí para que un reintento no compita con esta consulta.
+      await getDriverTrip(id).then(setUpdatedTrip, () => undefined);
     } finally {
       setBusy(null);
     }
   };
 
-  const finish = async () => {
-    setBusy('finish');
-    try {
+  const start = () =>
+    runAction('start', async () => {
+      setUpdatedTrip(await startTrip(id));
+    });
+
+  const finish = () =>
+    runAction('finish', async () => {
       await finishTrip(id);
       router.replace(`/viaje-conductor/${id}/finalizado`);
-    } finally {
-      setBusy(null);
-    }
-  };
+    });
 
-  const cancel = async () => {
-    setBusy('cancel');
-    try {
+  const cancel = () =>
+    runAction('cancel', async () => {
       await cancelTrip(id);
       setConfirmCancel(false);
       router.replace(`/viaje-conductor/${id}/cancelado`);
-    } finally {
-      setBusy(null);
-    }
+    });
+
+  const openCancelDialog = () => {
+    setActionError(null);
+    setConfirmCancel(true);
   };
+
+  const closeCancelDialog = () => {
+    if (busy === 'cancel') return;
+    setActionError(null);
+    setConfirmCancel(false);
+  };
+
+  if (trip?.status === 'finalizado') return <Redirect href={`/viaje-conductor/${id}/finalizado`} />;
+  if (trip?.status === 'cancelado') return <Redirect href={`/viaje-conductor/${id}/cancelado`} />;
 
   if (!trip) {
     return (
       <Screen header={<ScreenHeader title="Viaje programado" />}>
-        <ActivityIndicator color={colors.primary} style={styles.loading} />
+        <LoadState loading={loading} error={error} />
       </Screen>
     );
   }
 
   const inProgress = trip.status === 'en_curso';
+  const startEnabled = busy === null;
 
   return (
     <Screen
@@ -120,37 +135,44 @@ export default function DriverTripScreen() {
               <StopsTimeline stops={trip.stops} />
             )}
           </ScrollView>
-          <View style={styles.actionBar}>
-            <Button
-              title="Cancelar"
-              variant="outline"
-              disabled={busy !== null}
-              onPress={() => setConfirmCancel(true)}
-              style={[styles.actionButton, styles.cancelButton]}
-              textStyle={styles.actionText}
-            />
-            {inProgress ? (
+          <View style={styles.actionArea}>
+            {actionError && !confirmCancel ? (
+              <Text accessibilityLiveRegion="polite" style={styles.actionError}>
+                {actionError}
+              </Text>
+            ) : null}
+            <View style={styles.actionBar}>
               <Button
-                title="Finalizar viaje"
-                variant="tertiary"
-                loading={busy === 'finish'}
+                title="Cancelar"
+                variant="outline"
                 disabled={busy !== null}
-                icon={<IconBandera width={19} height={19} color={palette.white} />}
-                onPress={finish}
-                style={[styles.actionButton, styles.mainButton]}
+                onPress={openCancelDialog}
+                style={[styles.actionButton, styles.cancelButton]}
                 textStyle={styles.actionText}
               />
-            ) : (
-              <Button
-                title="Iniciar viaje"
-                loading={busy === 'start'}
-                disabled={busy !== null}
-                icon={<IconEnviar width={19} height={19} color={palette.white} />}
-                onPress={start}
-                style={[styles.actionButton, styles.mainButton]}
-                textStyle={styles.actionText}
-              />
-            )}
+              {inProgress ? (
+                <Button
+                  title="Finalizar viaje"
+                  variant="tertiary"
+                  loading={busy === 'finish'}
+                  disabled={busy !== null}
+                  icon={<IconBandera width={19} height={19} color={palette.white} />}
+                  onPress={finish}
+                  style={[styles.actionButton, styles.mainButton]}
+                  textStyle={styles.actionText}
+                />
+              ) : (
+                <Button
+                  title="Iniciar viaje"
+                  loading={busy === 'start'}
+                  disabled={busy !== null}
+                  icon={<IconEnviar width={19} height={19} color={START_BUTTON_TEXT} />}
+                  onPress={start}
+                  style={[styles.actionButton, styles.mainButton, startEnabled ? styles.startButton : null]}
+                  textStyle={[styles.actionText, startEnabled ? styles.startText : null]}
+                />
+              )}
+            </View>
           </View>
         </View>
       </View>
@@ -163,7 +185,8 @@ export default function DriverTripScreen() {
         cancelLabel="Volver"
         confirmLabel="Sí, cancelar"
         loading={busy === 'cancel'}
-        onCancel={() => setConfirmCancel(false)}
+        error={actionError}
+        onCancel={closeCancelDialog}
         onConfirm={cancel}
       />
     </Screen>
@@ -171,9 +194,6 @@ export default function DriverTripScreen() {
 }
 
 const styles = StyleSheet.create({
-  loading: {
-    marginTop: spacing.xl * 2,
-  },
   statusChip: {
     paddingVertical: 3,
   },
@@ -204,13 +224,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screen,
     paddingVertical: spacing.xs,
   },
-  actionBar: {
-    flexDirection: 'row',
-    gap: 9,
+  actionArea: {
+    gap: spacing.s,
     paddingHorizontal: spacing.screen,
     paddingTop: spacing.xl,
     paddingBottom: spacing.m,
     backgroundColor: ACTION_BAR_BACKGROUND,
+  },
+  actionError: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    textAlign: 'center',
+    color: colors.error,
+  },
+  actionBar: {
+    flexDirection: 'row',
+    gap: 9,
   },
   actionButton: {
     minHeight: 52,
@@ -224,8 +253,14 @@ const styles = StyleSheet.create({
   mainButton: {
     flex: 1.6,
   },
+  startButton: {
+    backgroundColor: START_BUTTON_BACKGROUND,
+  },
   actionText: {
     fontFamily: fonts.cairoBold,
     fontSize: 15.5,
+  },
+  startText: {
+    color: START_BUTTON_TEXT,
   },
 });

@@ -58,7 +58,8 @@ export type PassengerTrip = {
 /** Parada en el recorrido de un viaje (pestaña "Paradas"). */
 export type TripStop = {
   place: Place;
-  time: IsoDateTime;
+  /** El Backend todavía no guarda la hora estimada de las recogidas. */
+  time?: IsoDateTime;
   kind: 'origen' | 'recogida' | 'destino';
   /** Pasajero que se recoge en esta parada. */
   passengerName?: string;
