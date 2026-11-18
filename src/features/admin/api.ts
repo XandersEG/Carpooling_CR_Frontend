@@ -11,6 +11,8 @@ import type {
   ValorCatalogo,
 } from './types';
 
+import type { EstadisticasRespuesta } from '@/src/types/analytics';
+
 // llamadas al api del portal administrativo
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
@@ -254,3 +256,10 @@ export const restablecerContrasena = (token: string, password: string) =>
 
 // avisa al servidor para que el token deje de servir
 export const cerrarSesionEnServidor = () => pedir<void>('/admin/auth/logout', { metodo: 'POST' });
+
+
+
+/* --------------------------------- estadisticas ------------------------------- */
+
+export const obtenerEstadisticas = (filtros: { institucionId?: number; desde?: string; hasta?: string }) => 
+                                    pedir<EstadisticasRespuesta>('/statistics', { consulta: filtros });

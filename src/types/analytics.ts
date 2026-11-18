@@ -118,3 +118,19 @@ export type StatisticsSummary = {
   tripsByPaymentMethod: DistributionSlice[];
   usersByAgeRange: AgeRangeStat[];
 };
+
+
+// ──────── Parte 1 del diccionario ──────────────
+
+export type EstadisticasRespuesta = {
+  resumenDatos:{
+    conductoresActivos: number;
+    pasajerosActivos: number;
+    usuariosUnicos: number;
+    ambosRoles: number
+  };
+  conductoresGenero: { genero: string; total: number }[];
+  pasajerosGenero: { genero: string; total: number }[];
+  viajesMetodo: { metodo: string; total: number }[];
+  rangoEdad: { rango: string; genero: string; total: number }[];
+};

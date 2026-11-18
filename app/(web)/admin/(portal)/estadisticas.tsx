@@ -3,7 +3,7 @@ import { ActivityIndicator, Image, StyleSheet, Text, View, type ImageSourcePropT
 
 import { useAdminHeader } from '@/components/web/PageHeader';
 import { DonutChart, HorizontalBars } from '@/components/web/charts';
-import { InstitutionFilter, useInstitutionOptions } from '@/components/web/consultas/shared';
+//
 import { SelectField } from '@/components/web/controls';
 import { DateField, FilterCard, FilterItem } from '@/components/web/filters';
 import { webExtra, webShadow } from '@/components/web/tokens';
@@ -12,16 +12,29 @@ import type { DistributionSlice, StatisticsSummary } from '@/src/types/analytics
 import type { IsoDate } from '@/src/types/common';
 import { fonts, palette, webColors } from '@/src/constants/theme';
 
+// Cambios PP
+
+import { listarInstituciones } from '@/src/features/admin/api';
+import type { Institucion } from '@/src/features/admin/types';
+import { now } from '@/src/utils/clock';
+import { toIsoDate } from '@/src/utils/format';
+import { useToast } from '@/components/admin/Toast';
+
 const kpiCar = require('@/assets/images/web/kpi-car.png');
 const kpiPerson = require('@/assets/images/web/kpi-person.png');
 const kpiGroup = require('@/assets/images/web/kpi-group.png');
 
 // Filtros del frame 285:483. Los datos de ejemplo corresponden a ese filtro;
-// cambiar institución, fechas o género no recalcula las cifras.
-const DEFAULT_INSTITUTION = 'Tecnológico de Costa Rica';
-const DEFAULT_FROM: IsoDate = '2026-01-01';
-const DEFAULT_TO: IsoDate = '2026-10-15';
+// Filtros iniciales de la ventana.
+const DEFAULT_INSTITUTION = 'Todas las instituciones';
 const ALL_GENDERS = 'Todos los géneros';
+
+// Funciones de filtros predeterminados
+
+function hoy(): IsoDate{ return toIsoDate(now()); }
+
+function fechaInicial(): IsoDate{ return `${hoy().slice(0, 4)}-01-01`; }
+
 
 /** Colores de los segmentos: terracota, verde y malva. */
 const SLICE_COLORS = [palette.terracotta, webExtra.chartGreen, palette.mauve];
@@ -93,25 +106,55 @@ function GenderCard({ title, total, slices }: { title: string; total: number; sl
 
 /** Estadísticas (285:483): filtros, KPI, donas por género y método de pago, rangos de edad. */
 export default function StatisticsScreen() {
-  const options = useInstitutionOptions();
+
+  const [instituciones, setInstituciones] = useState<Institucion[]>([]);
   const [institution, setInstitution] = useState(DEFAULT_INSTITUTION);
-  const [from, setFrom] = useState<IsoDate | null>(DEFAULT_FROM);
-  const [to, setTo] = useState<IsoDate | null>(DEFAULT_TO);
+  const [from, setFrom] = useState<IsoDate | null>(fechaInicial);
+  const [to, setTo] = useState<IsoDate | null>(hoy);
   const [gender, setGender] = useState(ALL_GENDERS);
   const [genderOptions, setGenderOptions] = useState<string[]>([ALL_GENDERS]);
   const [stats, setStats] = useState<StatisticsSummary | null>(null);
+  const [aviso, mostrarAviso] = useToast();
 
   useAdminHeader({ title: 'Estadísticas', subtitle: 'Uso del servicio y consulta de datos' });
 
   useEffect(() => {
-    getStatistics().then(setStats);
+    listarInstituciones()
+      .then(setInstituciones)
+      .catch(() => setInstituciones([]));
     listGenderFilterOptions().then(setGenderOptions);
   }, []);
 
+  useEffect(() => {
+    const institucionId = instituciones.find((item) => item.nombre === institution)?.id;
+    getStatistics({ institucionId, desde: from, hasta: to }, gender)
+      .then(setStats)
+      .catch((error) => console.error(error));
+  }, [instituciones, institution, from, to, gender]);
+
+  const institutionOptions = [DEFAULT_INSTITUTION, ...instituciones.map((item) => item.nombre)];
+
   const reset = () => {
     setInstitution(DEFAULT_INSTITUTION);
-    setFrom(DEFAULT_FROM);
-    setTo(DEFAULT_TO);
+    setFrom(fechaInicial());
+    setTo(hoy());
+    setGender(ALL_GENDERS);
+  };
+
+  const cambiarDesde = (valor: IsoDate | null) =>{
+    if(valor && to && valor > to){
+      mostrarAviso('La fecha «Desde» no puede ser posterior a «Hasta».');
+      return;
+    }
+    setFrom(valor);
+  };
+
+  const cambiarHasta = (valor: IsoDate | null) =>{
+    if(valor && from && valor < from) {
+      mostrarAviso('La fecha «Hasta» no puede ser anterior a «Desde».');
+      return;
+    }
+    setTo(valor);
   };
 
   const paymentTotal = stats?.tripsByPaymentMethod.reduce((sum, slice) => sum + slice.count, 0) ?? 0;
@@ -119,14 +162,23 @@ export default function StatisticsScreen() {
   return (
     <View style={styles.page}>
       <FilterCard onReset={reset} resetLabel="Restablecer">
-        <InstitutionFilter value={institution} onChange={setInstitution} options={options} />
+        <FilterItem label="Institución">
+          <SelectField
+            value={institution}
+            options={institutionOptions}
+            onChange={setInstitution}
+            width={287}
+            accessibilityLabel="Institución"
+          />
+        </FilterItem>
         <FilterItem label="Desde">
-          <DateField value={from} onChange={setFrom} accessibilityLabel="Desde" />
+          <DateField value={from} onChange={cambiarDesde} accessibilityLabel="Desde" />
         </FilterItem>
         <FilterItem label="Hasta">
-          <DateField value={to} onChange={setTo} accessibilityLabel="Hasta" />
+          <DateField value={to} onChange={cambiarHasta} accessibilityLabel="Hasta" />
         </FilterItem>
       </FilterCard>
+      {aviso && <Text style={styles.aviso}>{aviso}</Text>}
 
       {stats === null ? (
         <ActivityIndicator color={palette.lime} style={styles.loading} />
@@ -436,5 +488,11 @@ const styles = StyleSheet.create({
     flex: 115,
     textAlign: 'right',
     paddingRight: 24,
+  },
+    aviso: {
+    marginTop: -20,
+    fontFamily: fonts.cairoBold,
+    fontSize: 16,
+    color: palette.terracotta,
   },
 });
