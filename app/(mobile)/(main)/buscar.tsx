@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import { BottomSheet } from '@/components/mobile/BottomSheet';
 import { CalendarPicker } from '@/components/mobile/CalendarPicker';
 import { MapView } from '@/components/mobile/MapView';
+import { PlaceAutocomplete } from '@/components/mobile/PlaceAutocomplete';
 import { Screen } from '@/components/mobile/Screen';
 import { ScreenHeader } from '@/components/mobile/ScreenHeader';
 import { SearchField } from '@/components/mobile/SearchField';
@@ -53,18 +54,21 @@ export default function BuscarScreen() {
       <View style={styles.cardWrapper}>
         <View style={styles.cardBackdrop} />
         <View style={styles.card}>
-          <SearchField
+          {/* origin and destination suggest places in Costa Rica while typing */}
+          <PlaceAutocomplete
             kind="origen"
             value={search.origin}
             placeholder="Origen"
             onChangeText={(origin) => update({ origin })}
+            onSelect={(place) => update({ origin: place.name })}
             inputProps={{ returnKeyType: 'next' }}
           />
-          <SearchField
+          <PlaceAutocomplete
             kind="destino"
             value={search.destination}
             placeholder="Destino"
             onChangeText={(destination) => update({ destination })}
+            onSelect={(place) => update({ destination: place.name })}
             inputProps={{ returnKeyType: 'search', onSubmitEditing: canSearch ? handleSearch : undefined }}
           />
           <SearchField

@@ -18,19 +18,24 @@ import { LocationPickerMap, type PickTarget } from '@/components/mobile/driver/L
 import { VehicleCard } from '@/components/mobile/driver/VehicleCard';
 import { Stepper } from '@/components/mobile/Form';
 import { IconPlus } from '@/components/mobile/icons';
+import { PlaceAutocomplete } from '@/components/mobile/PlaceAutocomplete';
 import { Screen } from '@/components/mobile/Screen';
 import { ScreenHeader } from '@/components/mobile/ScreenHeader';
 import { SearchField } from '@/components/mobile/SearchField';
 import { formatSlot, TimeSlotPicker } from '@/components/mobile/TimeSlotPicker';
 import { Button } from '@/components/shared/Button';
-import { colors, fonts, palette, radius, spacing, typography } from '@/src/constants/theme';
+import { colors, fonts, palette, radius, shadows, spacing, typography } from '@/src/constants/theme';
 import { listPaymentMethods, publishTrip } from '@/src/services/driverService';
+import { describePoint, type PlaceSuggestion } from '@/src/services/placeService';
 import { activateVehicle, listMyVehicles } from '@/src/services/vehicleService';
 import type { PaymentMethodItem } from '@/src/types/admin';
 import type { GeoPoint } from '@/src/types/common';
 import type { Vehicle } from '@/src/types/vehicle';
 import { now } from '@/src/utils/clock';
 import { formatPassengers, formatRelativeDay, toIsoDate } from '@/src/utils/format';
+
+/** Height of the map hidden behind the title and fields card, so fitted points stay visible. */
+const ROUTE_CARD_INSET = 200;
 
 /** Hora inicial del diseño ("6:30 a. m."). */
 const DEFAULT_TIME = '06:30';
@@ -110,6 +115,32 @@ export default function PublishTripScreen() {
     } else {
       setDestinationPoint(point);
     }
+    // a point tapped on the map gets a name if its field is still empty
+    const name = target === 'origen' ? origin : destination;
+    if (!name.trim()) {
+      describePoint(point)
+        .then((place) => {
+          if (!place) return;
+          const setName = target === 'origen' ? setOrigin : setDestination;
+          // only fill it if the driver did not type something meanwhile
+          setName((current) => (current.trim() ? current : place.name));
+        })
+        .catch(() => {
+          // without a name the driver can still type it
+        });
+    }
+  };
+
+  // a picked suggestion sets the field's name and its point on the map
+  const selectPlace = (target: PickTarget, place: PlaceSuggestion) => {
+    if (target === 'origen') {
+      setOrigin(place.name);
+      setOriginPoint(place.point);
+      if (!destinationPoint) setMapTarget('destino');
+    } else {
+      setDestination(place.name);
+      setDestinationPoint(place.point);
+    }
   };
 
   const confirmActivation = async () => {
@@ -186,7 +217,13 @@ export default function PublishTripScreen() {
   }
 
   return (
-    <Screen scroll header={header} footer={footer} contentStyle={styles.content}>
+    // the Ruta step does not scroll: its map fills the visible space under the fields
+    <Screen
+      scroll={step !== 'ruta'}
+      header={header}
+      footer={footer}
+      contentStyle={step === 'ruta' ? styles.routeContent : styles.content}
+    >
       {step === 'vehiculo' ? (
         <>
           <SectionTitle title="Mis vehículos" subtitle="Elige el vehículo que utilizas para realizar viajes" />
@@ -207,25 +244,8 @@ export default function PublishTripScreen() {
       ) : null}
 
       {step === 'ruta' ? (
-        <>
-          <SectionTitle title="Ruta" subtitle="Indica el punto de partida y el destino del viaje" />
-          <FieldGroup style={styles.groupSpacing}>
-            {/* focusing a field chooses which point the next tap on the map sets */}
-            <SearchField
-              kind="origen"
-              value={origin}
-              placeholder="Origen"
-              onChangeText={setOrigin}
-              inputProps={{ onFocus: () => setMapTarget('origen') }}
-            />
-            <SearchField
-              kind="destino"
-              value={destination}
-              placeholder="Destino"
-              onChangeText={setDestination}
-              inputProps={{ onFocus: () => setMapTarget('destino') }}
-            />
-          </FieldGroup>
+        <View style={styles.routeArea}>
+          {/* full-width map behind the title and the fields card */}
           <LocationPickerMap
             origin={originPoint}
             destination={destinationPoint}
@@ -233,14 +253,44 @@ export default function PublishTripScreen() {
             onPick={pickPoint}
             originLabel={origin.trim()}
             destinationLabel={destination.trim()}
-            style={styles.map}
+            topInset={ROUTE_CARD_INSET}
+            style={styles.routeMap}
           />
-          <Text style={styles.note}>
-            {Platform.OS === 'web'
-              ? 'El mapa interactivo solo está disponible en la app móvil.'
-              : `Toca el mapa para marcar el ${mapTarget === 'origen' ? 'origen' : 'destino'}. Puedes arrastrar los marcadores.`}
-          </Text>
-        </>
+          <View style={styles.routeTitle}>
+            <SectionTitle title="Ruta" subtitle="Indica el punto de partida y el destino del viaje" />
+          </View>
+          <View style={styles.routeCardWrapper}>
+            {/* white band behind the top half of the card, as in "Buscar rutas" */}
+            <View style={styles.routeCardBackdrop} />
+            <FieldGroup>
+              {/* focusing a field chooses which point the next tap on the map sets */}
+              <PlaceAutocomplete
+                kind="origen"
+                value={origin}
+                placeholder="Origen"
+                onChangeText={setOrigin}
+                onSelect={(place) => selectPlace('origen', place)}
+                inputProps={{ onFocus: () => setMapTarget('origen') }}
+              />
+              <PlaceAutocomplete
+                kind="destino"
+                value={destination}
+                placeholder="Destino"
+                onChangeText={setDestination}
+                onSelect={(place) => selectPlace('destino', place)}
+                inputProps={{ onFocus: () => setMapTarget('destino') }}
+              />
+            </FieldGroup>
+          </View>
+          {/* hint floating at the bottom of the map */}
+          <View style={styles.routeHint} pointerEvents="none">
+            <Text style={styles.routeHintText}>
+              {Platform.OS === 'web'
+                ? 'El mapa interactivo solo está disponible en la app móvil.'
+                : `Escribe un lugar o toca el mapa para marcar el ${mapTarget === 'origen' ? 'origen' : 'destino'}.`}
+            </Text>
+          </View>
+        </View>
       ) : null}
 
       {step === 'horario' ? (
@@ -391,8 +441,50 @@ const styles = StyleSheet.create({
   sectionGap: {
     marginTop: spacing.xl * 3,
   },
-  map: {
-    marginTop: spacing.xl * 3,
+  routeContent: {
+    flex: 1,
+  },
+  routeArea: {
+    flex: 1,
+  },
+  routeMap: {
+    ...StyleSheet.absoluteFill,
+    height: '100%',
+  },
+  routeTitle: {
+    paddingTop: 20,
+    paddingHorizontal: spacing.screen,
+    backgroundColor: colors.background,
+  },
+  routeCardWrapper: {
+    paddingTop: spacing.xl,
+    paddingHorizontal: spacing.screen,
+  },
+  routeCardBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '55%',
+    backgroundColor: colors.background,
+  },
+  routeHint: {
+    position: 'absolute',
+    left: spacing.screen,
+    right: spacing.screen,
+    bottom: spacing.m,
+    alignItems: 'center',
+  },
+  routeHintText: {
+    ...typography.textSmall,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.xs,
+    overflow: 'hidden',
+    textAlign: 'center',
+    color: colors.textPrimary,
+    backgroundColor: colors.background,
+    borderRadius: radius.card,
+    ...shadows.mapLabel,
   },
   note: {
     ...typography.subtitle,

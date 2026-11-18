@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import MapView, { Marker, Polyline, type MapPressEvent } from 'react-native-maps';
 
@@ -15,6 +16,8 @@ export type LocationPickerMapProps = {
   onPick: (target: PickTarget, point: GeoPoint) => void;
   originLabel?: string;
   destinationLabel?: string;
+  /** Map height covered by content on top (e.g. a fields card), kept clear when fitting the points. */
+  topInset?: number;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -51,14 +54,32 @@ export function LocationPickerMap({
   onPick,
   originLabel,
   destinationLabel,
+  topInset = 0,
   style,
 }: LocationPickerMapProps) {
+  const mapRef = useRef<MapView>(null);
+
+  // keep the picked points in view (e.g. after choosing a suggestion far from the current view)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (origin && destination) {
+      map.fitToCoordinates([toLatLng(origin), toLatLng(destination)], {
+        edgePadding: { top: 60 + topInset, right: 60, bottom: 60, left: 60 },
+        animated: true,
+      });
+    } else if (origin || destination) {
+      const point = (origin ?? destination) as GeoPoint;
+      map.animateToRegion({ ...toLatLng(point), latitudeDelta: 0.05, longitudeDelta: 0.05 });
+    }
+  }, [origin, destination, topInset]);
+
   const handlePress = (event: MapPressEvent) => {
     onPick(target, toGeoPoint(event.nativeEvent.coordinate));
   };
 
   return (
-    <MapView style={[styles.map, style]} initialRegion={INITIAL_REGION} onPress={handlePress}>
+    <MapView ref={mapRef} style={[styles.map, style]} initialRegion={INITIAL_REGION} onPress={handlePress}>
       {origin ? (
         <Marker
           coordinate={toLatLng(origin)}
