@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DetailDivider, DetailRow } from '@/components/mobile/Detail';
 import { DestinationSquare, OriginDot, RouteVertical } from '@/components/mobile/Route';
@@ -8,6 +8,7 @@ import { formatDayMonth, formatTime } from '@/src/utils/format';
 
 import { IconAceptar, IconRechazar } from './icons';
 import { PassengersEarningsCard } from './PassengersEarningsCard';
+
 
 type RequestCardProps = {
   request: IncomingRequest;
@@ -58,7 +59,7 @@ export function RequestCard({ request, expanded, busy = false, onToggle, onAccep
 
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole={Platform.OS === 'web' ? undefined : 'button'}
       accessibilityState={{ expanded: showExpanded }}
       accessibilityLabel={`Solicitud de ${route}${accepted ? ', aceptada' : ''}`}
       disabled={!hasDetail}
