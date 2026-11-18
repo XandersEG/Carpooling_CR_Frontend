@@ -22,6 +22,8 @@ type ConfirmDialogProps = {
   confirmVariant?: ButtonVariant;
   /** Muestra un indicador en el botón de confirmar mientras se procesa la acción. */
   loading?: boolean;
+  /** Mensaje si la acción falló; el diálogo sigue abierto para reintentar. */
+  error?: string | null;
   onCancel: () => void;
   onConfirm: () => void;
 };
@@ -43,6 +45,7 @@ export function ConfirmDialog({
   confirmLabel,
   confirmVariant = 'soft',
   loading = false,
+  error,
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
@@ -55,6 +58,11 @@ export function ConfirmDialog({
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
           {note ? <Text style={styles.note}>{note}</Text> : null}
+          {error ? (
+            <Text accessibilityLiveRegion="polite" style={styles.error}>
+              {error}
+            </Text>
+          ) : null}
           <View style={styles.buttons}>
             <Button
               title={cancelLabel}
@@ -127,6 +135,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     color: colors.textDark,
+  },
+  error: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    textAlign: 'center',
+    color: colors.error,
   },
   buttons: {
     alignSelf: 'stretch',

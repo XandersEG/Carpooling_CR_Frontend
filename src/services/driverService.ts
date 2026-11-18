@@ -2,13 +2,114 @@
  * Viajes desde la perspectiva del conductor: publicar, solicitudes y ejecución
  * del viaje (iniciar, finalizar, cancelar).
  *
- * Provisional: implementación simulada con datos de ejemplo.
+ * Consultar, iniciar, finalizar y cancelar un viaje usan el Backend cuando
+ * `EXPO_PUBLIC_USE_MOCKS=false`. Provisional: lo demás sigue simulado.
  */
 import type { Id } from '@/src/types/common';
-import type { DriverTrip, IncomingRequest, PublishTripInput, TripStatus } from '@/src/types/trip';
+import type { DriverTrip, IncomingRequest, PublishTripInput, TripStatus, TripStop } from '@/src/types/trip';
+import { now } from '@/src/utils/clock';
 
+import { apiRequest } from './apiClient';
+import { USE_MOCK_DATA } from './config';
 import { db } from './mock/db';
 import { createId, notFound, respond } from './mock/utils';
+
+type ApiPlace = { nombre: string; lat: number; lng: number };
+
+/** Respuesta de `/driver/trips/:id`. */
+type DriverTripResponse = {
+  id: number;
+  estado: 'PROGRAMADO' | 'EN_CURSO' | 'FINALIZADO' | 'CANCELADO';
+  origen: ApiPlace;
+  destino: ApiPlace;
+  salida: string;
+  finReal: string | null;
+  cuposTotales: number;
+  cuposDisponibles: number;
+  costo: number;
+  metodoPago: { id: number; nombre: string };
+  conductor: { id: number; nombre: string; fotoUrl: string | null };
+  vehiculo: { marca: string; modelo: string; color: string; placa: string };
+  pasajeros: {
+    solicitudId: number;
+    pasajeroId: number;
+    nombre: string;
+    fotoUrl: string | null;
+    puntoRecogida: ApiPlace;
+  }[];
+};
+
+const STATUS_FROM_API: Record<DriverTripResponse['estado'], TripStatus> = {
+  PROGRAMADO: 'programado',
+  EN_CURSO: 'en_curso',
+  FINALIZADO: 'finalizado',
+  CANCELADO: 'cancelado',
+};
+
+function toDriverTrip(response: DriverTripResponse): DriverTrip {
+  const id = String(response.id);
+  const paymentMethod = { id: String(response.metodoPago.id), name: response.metodoPago.nombre };
+  const origin = { name: response.origen.nombre };
+  const destination = { name: response.destino.nombre };
+  const arrivalAt = response.finReal ?? undefined;
+
+  const stops: TripStop[] = [
+    { place: origin, time: response.salida, kind: 'origen' },
+    ...response.pasajeros.map(
+      (passenger): TripStop => ({
+        place: { name: passenger.puntoRecogida.nombre },
+        kind: 'recogida',
+        passengerName: passenger.nombre,
+      }),
+    ),
+    { place: destination, time: arrivalAt, kind: 'destino' },
+  ];
+
+  return {
+    id,
+    driver: {
+      id: String(response.conductor.id),
+      fullName: response.conductor.nombre,
+      avatarUrl: response.conductor.fotoUrl ?? undefined,
+    },
+    vehicle: {
+      brand: response.vehiculo.marca,
+      model: response.vehiculo.modelo,
+      color: response.vehiculo.color,
+      plate: response.vehiculo.placa,
+    },
+    origin,
+    destination,
+    departureAt: response.salida,
+    arrivalAt,
+    costPerPassenger: response.costo,
+    paymentMethod,
+    seats: response.cuposTotales,
+    availableSeats: response.cuposDisponibles,
+    status: STATUS_FROM_API[response.estado],
+    passengers: response.pasajeros.map((passenger) => ({
+      id: String(passenger.solicitudId),
+      tripId: id,
+      passenger: {
+        id: String(passenger.pasajeroId),
+        fullName: passenger.nombre,
+        avatarUrl: passenger.fotoUrl ?? undefined,
+      },
+      pickupPoint: { name: passenger.puntoRecogida.nombre },
+      amount: response.costo,
+      paymentMethod,
+      status: 'aprobada',
+    })),
+    stops,
+  };
+}
+
+async function requestTripAction(id: Id, action: 'start' | 'finish' | 'cancel'): Promise<DriverTrip> {
+  const response = await apiRequest<DriverTripResponse>(`/driver/trips/${encodeURIComponent(id)}/${action}`, {
+    method: 'POST',
+  });
+  return toDriverTrip(response);
+}
 
 export async function publishTrip(input: PublishTripInput): Promise<DriverTrip> {
   const vehicle = db.vehicles.find((item) => item.id === input.vehicleId);
@@ -79,6 +180,10 @@ export async function getDriverTrips(): Promise<DriverTrip[]> {
 }
 
 export async function getDriverTrip(id: Id): Promise<DriverTrip> {
+  if (!USE_MOCK_DATA) {
+    return toDriverTrip(await apiRequest<DriverTripResponse>(`/driver/trips/${encodeURIComponent(id)}`));
+  }
+
   const trip = db.driverTrips.find((item) => item.id === id);
   if (!trip) throw notFound('Viaje', id);
   return respond(trip);
@@ -88,18 +193,19 @@ async function setTripStatus(id: Id, status: TripStatus): Promise<DriverTrip> {
   const trip = db.driverTrips.find((item) => item.id === id);
   if (!trip) throw notFound('Viaje', id);
   trip.status = status;
+  if (status === 'finalizado') trip.arrivalAt ??= now().toISOString();
   return respond(trip);
 }
 
 export function startTrip(id: Id): Promise<DriverTrip> {
-  return setTripStatus(id, 'en_curso');
+  return USE_MOCK_DATA ? setTripStatus(id, 'en_curso') : requestTripAction(id, 'start');
 }
 
 export function finishTrip(id: Id): Promise<DriverTrip> {
-  return setTripStatus(id, 'finalizado');
+  return USE_MOCK_DATA ? setTripStatus(id, 'finalizado') : requestTripAction(id, 'finish');
 }
 
 /** Según el diseño, se avisa a los pasajeros aceptados y el viaje se cierra. */
 export function cancelTrip(id: Id): Promise<DriverTrip> {
-  return setTripStatus(id, 'cancelado');
+  return USE_MOCK_DATA ? setTripStatus(id, 'cancelado') : requestTripAction(id, 'cancel');
 }
