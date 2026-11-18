@@ -240,20 +240,20 @@ export const driverTrips: DriverTrip[] = [
 
 /** Tarjetas de la pantalla "Solicitudes". Solo la primera tiene detalle en el diseño. */
 export const incomingRequests: IncomingRequest[] = [
-  {
-    id: 'ir-1',
-    tripId: 't-mine',
-    origin: places.sanJose,
-    destination: places.tecCartago,
-    departureAt: '2026-10-25T18:30:00-06:00',
-    arrivalAt: '2026-10-25T19:30:00-06:00',
-    passengers: acceptedPassengers.map((request) => ({ ...request, status: 'pendiente' })),
-    status: 'pendiente',
-  },
-  { id: 'ir-2', origin: places.tecCartago, destination: places.heredia, passengers: [], status: 'pendiente' },
-  { id: 'ir-3', origin: places.heredia, destination: { name: 'TEC SJO' }, passengers: [], status: 'pendiente' },
-  { id: 'ir-4', origin: places.tecCartago, destination: places.alajuela, passengers: [], status: 'pendiente' },
-];
+  { passenger: people.ana, pickupPoint: { name: 'Parada Ochomogo' } },
+  { passenger: people.luis, pickupPoint: { name: 'Tres Ríos' } },
+  { passenger: people.karla, pickupPoint: { name: 'Mall San Pedro' } },
+].map(({ passenger, pickupPoint }) => ({
+  id: `ir-${passenger.id}`,
+  tripId: driverTrips[0].id,
+  passenger,
+  pickupPoint,
+  origin: driverTrips[0].origin,
+  destination: driverTrips[0].destination,
+  departureAt: driverTrips[0].departureAt,
+  amount: driverTrips[0].costPerPassenger,
+  status: 'pendiente',
+}));
 
 export const tripHistory: TripHistoryItem[] = [
   {

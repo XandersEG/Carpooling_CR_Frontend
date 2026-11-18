@@ -83,6 +83,11 @@ export type PublishTripInput = {
   paymentMethodId: Id;
 };
 
+
+
+/** Estado de una solicitud en la pantalla "Solicitudes" del conductor. */
+export type IncomingRequestStatus = 'pendiente' | 'aceptada' | 'rechazada';
+
 /**
  * Tarjeta de la pantalla "Solicitudes" del conductor.
  *
@@ -93,13 +98,14 @@ export type PublishTripInput = {
  */
 export type IncomingRequest = {
   id: Id;
-  tripId?: Id;
+  tripId: Id;
+  passenger: PersonSummary;
+  pickupPoint: Place;
   origin: Place;
   destination: Place;
-  departureAt?: IsoDateTime;
-  arrivalAt?: IsoDateTime;
-  passengers: JoinRequest[];
-  status: 'pendiente' | 'aceptada' | 'rechazada';
+  departureAt: IsoDateTime;
+  amount: Colones;
+  status: IncomingRequestStatus;
 };
 
 /** Elemento del "Historial de viajes". */
