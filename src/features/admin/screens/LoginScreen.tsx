@@ -21,6 +21,7 @@ import { useLayout } from '../useLayout';
 const REVISA_TUS_DATOS = 'Revisa tu correo y contraseña para continuar.';
 const SESION_VENCIDA = 'Tu sesión venció. Inicia sesión de nuevo.';
 const CONTRASENA_CAMBIADA = 'Tu contraseña se cambió. Inicia sesión con la nueva.';
+const CUENTA_DESACTIVADA = 'Tu cuenta quedó desactivada.';
 
 // mensaje para mostrar cuando el inicio de sesión falla
 function mensajeDeFallo(error: unknown): string {
@@ -34,10 +35,12 @@ function mensajeDeFallo(error: unknown): string {
 export function LoginScreen() {
   const router = useRouter();
   // llega con "vencida" cuando el portal sacó al administrador porque su sesión ya no servía,
-  // y con "restablecida" después de cambiar la contraseña desde el enlace del correo
-  const { vencida, restablecida } = useLocalSearchParams<{
+  // con "restablecida" después de cambiar la contraseña, desde el enlace del correo o en el portal
+  // y con "desactivada" cuando el administrador desactivó su propia cuenta
+  const { vencida, restablecida, desactivada } = useLocalSearchParams<{
     vencida?: string;
     restablecida?: string;
+    desactivada?: string;
   }>();
   const [correo, setCorreo] = useState('');
   const [contrasena, setContrasena] = useState('');
@@ -45,7 +48,13 @@ export function LoginScreen() {
   const [entrando, setEntrando] = useState(false);
   const { angosta } = useLayout();
   const [aviso, setAviso] = useState<string | null>(
-    vencida ? SESION_VENCIDA : restablecida ? CONTRASENA_CAMBIADA : null,
+    vencida
+      ? SESION_VENCIDA
+      : restablecida
+        ? CONTRASENA_CAMBIADA
+        : desactivada
+          ? CUENTA_DESACTIVADA
+          : null,
   );
 
   // con datos incorrectos los campos se pintan en color de error

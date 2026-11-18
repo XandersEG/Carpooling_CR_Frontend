@@ -14,7 +14,7 @@ import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from '
 import Logo from '@/assets/images/admin/logo.svg';
 import Tuanis from '@/assets/images/admin/tuanis.svg';
 import { cerrarSesionEnServidor } from '@/src/features/admin/api';
-import { cerrarSesion, iniciales, leerSesion } from '@/src/features/admin/session';
+import { cerrarSesion, iniciales, useNombreDeSesion } from '@/src/features/admin/session';
 import { color, fuente } from '@/src/features/admin/theme';
 import { useLayout } from '@/src/features/admin/useLayout';
 
@@ -154,7 +154,7 @@ export function Sidebar({ abierto, onClose }: Props) {
   const ruta = usePathname();
   const router = useRouter();
   const { angosta, celular } = useLayout();
-  const sesion = leerSesion();
+  const nombre = useNombreDeSesion();
 
   function salir() {
     // no se espera al servidor: aunque no responda, la sesión se borra de este navegador
@@ -235,13 +235,13 @@ export function Sidebar({ abierto, onClose }: Props) {
             </Pressable>
           </View>
           {secciones}
-          {sesion ? (
+          {nombre ? (
             <View style={styles.usuario}>
               <View style={styles.avatar}>
-                <Text style={styles.iniciales}>{iniciales(sesion.nombre)}</Text>
+                <Text style={styles.iniciales}>{iniciales(nombre)}</Text>
               </View>
               <View style={styles.datosUsuario}>
-                <Text style={styles.nombreUsuario}>{sesion.nombre}</Text>
+                <Text style={styles.nombreUsuario}>{nombre}</Text>
                 <Text style={styles.rol}>Administrador</Text>
               </View>
             </View>

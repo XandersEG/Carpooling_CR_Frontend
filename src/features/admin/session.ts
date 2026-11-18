@@ -1,6 +1,8 @@
+import { useSyncExternalStore } from 'react';
+
 // sesión del administrador en el portal web
 
-export type AdminSession = { token: string; nombre: string };
+export type AdminSession = { token: string; id: number; nombre: string };
 
 const CLAVE = 'tuanis.admin';
 
@@ -21,10 +23,14 @@ function almacen(nombre: Almacen): Storage | null {
   }
 }
 
-// lo guardado pudo cambiarse a mano: sirve solo si tiene la forma de una sesión
+// lo guardado pudo cambiarse a mano o ser de antes de guardar el id: debe tener forma de sesión
 function esSesion(valor: unknown): valor is AdminSession {
   const sesion = valor as AdminSession | null;
-  return typeof sesion?.token === 'string' && typeof sesion.nombre === 'string';
+  return (
+    typeof sesion?.token === 'string' &&
+    typeof sesion.id === 'number' &&
+    typeof sesion.nombre === 'string'
+  );
 }
 
 function leerGuardada(nombre: Almacen): AdminSession | null {
@@ -63,6 +69,39 @@ export function cerrarSesion(): void {
       // almacén bloqueado: no hay nada que borrar
     }
   }
+}
+
+// pantallas que muestran el nombre y se vuelven a dibujar cuando cambia
+const oyentes = new Set<() => void>();
+
+function suscribir(oyente: () => void): () => void {
+  oyentes.add(oyente);
+  return () => {
+    oyentes.delete(oyente);
+  };
+}
+
+// cambia el nombre de la sesión en el mismo almacén donde está guardada
+export function cambiarNombreDeSesion(nuevoNombre: string): void {
+  if (enMemoria) {
+    enMemoria = { ...enMemoria, nombre: nuevoNombre };
+  }
+  for (const nombre of ['localStorage', 'sessionStorage'] as const) {
+    const sesion = leerGuardada(nombre);
+    try {
+      if (sesion) {
+        almacen(nombre)?.setItem(CLAVE, JSON.stringify({ ...sesion, nombre: nuevoNombre }));
+      }
+    } catch {
+      // el navegador no dejó guardar: queda el nombre de la copia en memoria
+    }
+  }
+  oyentes.forEach((oyente) => oyente());
+}
+
+// nombre del administrador que entró; quien lo usa se actualiza en cuanto cambia
+export function useNombreDeSesion(): string | null {
+  return useSyncExternalStore(suscribir, () => leerSesion()?.nombre ?? null);
 }
 
 // iniciales para el avatar: "Diego Araya" da "DA"

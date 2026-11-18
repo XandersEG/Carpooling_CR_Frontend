@@ -230,7 +230,7 @@ export const actualizarAdministrador = (
 
 // con "recordar" el servidor da una sesión más larga
 export const iniciarSesion = (correo: string, password: string, recordar: boolean) =>
-  pedir<{ token: string; nombre: string }>('/admin/auth/login', {
+  pedir<{ token: string; id: number; nombre: string }>('/admin/auth/login', {
     metodo: 'POST',
     cuerpo: { correo, password, recordar },
     sinSesion: true,
