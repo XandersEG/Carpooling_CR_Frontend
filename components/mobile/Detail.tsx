@@ -122,6 +122,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   badge: {
+    maxWidth: '100%',
     paddingVertical: 3,
   },
   notice: {

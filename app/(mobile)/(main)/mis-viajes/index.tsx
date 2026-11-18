@@ -54,13 +54,15 @@ export default function MisViajesScreen() {
             }
           />
           <View style={styles.controls}>
-            <SearchSummary
-              origin={search.origin}
-              destination={search.destination}
-              dateLabel={formatSearchDate(search.date)}
-              timeLabel={formatSearchTime(search.time)}
-              onEdit={() => router.push({ pathname: '/buscar', params: search })}
-            />
+            {search.origin || search.destination ? (
+              <SearchSummary
+                origin={search.origin}
+                destination={search.destination}
+                dateLabel={formatSearchDate(search.date)}
+                timeLabel={formatSearchTime(search.time)}
+                onEdit={() => router.push({ pathname: '/buscar', params: search })}
+              />
+            ) : null}
             <SegmentedControl options={VIEW_OPTIONS} value={view} onChange={setView} />
           </View>
         </>
@@ -68,6 +70,8 @@ export default function MisViajesScreen() {
     >
       {myTrips.loading || myTrips.error ? (
         <LoadState loading={myTrips.loading} error={myTrips.error} />
+      ) : items.length === 0 ? (
+        <LoadState loading={false} error="Todavía no tienes viajes." />
       ) : view === 'lista' ? (
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
           {items.map((item) => (
