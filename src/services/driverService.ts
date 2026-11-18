@@ -2,9 +2,11 @@
  * Viajes desde la perspectiva del conductor: publicar, solicitudes y ejecución
  * del viaje (iniciar, finalizar, cancelar).
  *
- * Consultar, iniciar, finalizar y cancelar un viaje usan el Backend cuando
- * `EXPO_PUBLIC_USE_MOCKS=false`. Provisional: lo demás sigue simulado.
+ * Publicar, consultar, iniciar, finalizar y cancelar un viaje y listar los
+ * métodos de pago usan el Backend cuando `EXPO_PUBLIC_USE_MOCKS=false`.
+ * Provisional: lo demás sigue simulado.
  */
+import type { PaymentMethodItem } from '@/src/types/admin';
 import type { Id } from '@/src/types/common';
 import type { DriverTrip, IncomingRequest, PublishTripInput, TripStatus, TripStop } from '@/src/types/trip';
 import { now } from '@/src/utils/clock';
@@ -111,7 +113,63 @@ async function requestTripAction(id: Id, action: 'start' | 'finish' | 'cancel'):
   return toDriverTrip(response);
 }
 
+/** Payment method as returned by `GET /catalogs/payment-methods` (only active ones). */
+type PaymentMethodResponse = {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+  activo: boolean;
+};
+
+/** Payment methods the driver can choose when publishing a trip. */
+export async function listPaymentMethods(): Promise<PaymentMethodItem[]> {
+  if (!USE_MOCK_DATA) {
+    const response = await apiRequest<PaymentMethodResponse[]>('/catalogs/payment-methods');
+    return response.map((method) => ({
+      id: String(method.id),
+      name: method.nombre,
+      description: method.descripcion ?? '',
+      active: method.activo,
+    }));
+  }
+  return respond(db.catalogs['metodos-pago']);
+}
+
+/** Body of `POST /driver/trips`. */
+type PublishTripRequest = {
+  vehiculoId: number;
+  metodoPagoId: number;
+  origenNombre: string;
+  origenLat: number;
+  origenLng: number;
+  destinoNombre: string;
+  destinoLat: number;
+  destinoLng: number;
+  fechaHoraSalida: string;
+  cuposTotales: number;
+  costo: number;
+};
+
+/** Publishes the trip; with the real API the created trip is then loaded with its full details. */
 export async function publishTrip(input: PublishTripInput): Promise<DriverTrip> {
+  if (!USE_MOCK_DATA) {
+    const body: PublishTripRequest = {
+      vehiculoId: Number(input.vehicleId),
+      metodoPagoId: Number(input.paymentMethodId),
+      origenNombre: input.origin.name,
+      origenLat: input.originPoint.lat,
+      origenLng: input.originPoint.lng,
+      destinoNombre: input.destination.name,
+      destinoLat: input.destinationPoint.lat,
+      destinoLng: input.destinationPoint.lng,
+      fechaHoraSalida: input.departureAt,
+      cuposTotales: input.seats,
+      costo: input.costPerPassenger,
+    };
+    const created = await apiRequest<{ id: number }>('/driver/trips', { method: 'POST', body });
+    return getDriverTrip(String(created.id));
+  }
+
   const vehicle = db.vehicles.find((item) => item.id === input.vehicleId);
   if (!vehicle) throw notFound('Vehículo', input.vehicleId);
 

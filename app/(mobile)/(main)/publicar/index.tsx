@@ -14,7 +14,7 @@ import {
   StepTabs,
   type PublishStep,
 } from '@/components/mobile/driver/PublishParts';
-import { PublishRouteMap } from '@/components/mobile/driver/RouteMaps';
+import { LocationPickerMap, type PickTarget } from '@/components/mobile/driver/LocationPickerMap';
 import { VehicleCard } from '@/components/mobile/driver/VehicleCard';
 import { Stepper } from '@/components/mobile/Form';
 import { IconPlus } from '@/components/mobile/icons';
@@ -24,10 +24,10 @@ import { SearchField } from '@/components/mobile/SearchField';
 import { formatSlot, TimeSlotPicker } from '@/components/mobile/TimeSlotPicker';
 import { Button } from '@/components/shared/Button';
 import { colors, fonts, palette, radius, spacing, typography } from '@/src/constants/theme';
-import { listCatalog } from '@/src/services/admin/catalogService';
-import { publishTrip } from '@/src/services/driverService';
+import { listPaymentMethods, publishTrip } from '@/src/services/driverService';
 import { activateVehicle, listMyVehicles } from '@/src/services/vehicleService';
 import type { PaymentMethodItem } from '@/src/types/admin';
+import type { GeoPoint } from '@/src/types/common';
 import type { Vehicle } from '@/src/types/vehicle';
 import { now } from '@/src/utils/clock';
 import { formatPassengers, formatRelativeDay, toIsoDate } from '@/src/utils/format';
@@ -46,9 +46,15 @@ export default function PublishTripScreen() {
   const [vehicles, setVehicles] = useState<Vehicle[] | null>(null);
   const [toActivate, setToActivate] = useState<Vehicle | null>(null);
   const [activating, setActivating] = useState(false);
+  // Backend error on activation; shown inside the dialog so the driver can retry
+  const [activationError, setActivationError] = useState<string | null>(null);
 
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
+  // points picked on the map; the Backend needs coordinates for both
+  const [originPoint, setOriginPoint] = useState<GeoPoint | null>(null);
+  const [destinationPoint, setDestinationPoint] = useState<GeoPoint | null>(null);
+  const [mapTarget, setMapTarget] = useState<PickTarget>('origen');
 
   const today = useMemo(() => toIsoDate(now()), []);
   const [date, setDate] = useState(today);
@@ -76,7 +82,7 @@ export default function PublishTripScreen() {
   );
 
   useEffect(() => {
-    listCatalog('metodos-pago').then((items) => {
+    listPaymentMethods().then((items) => {
       const available = items.filter((item) => item.active);
       setMethods(available);
       setMethodId((current) => current ?? available.find((item) => paymentKind(item.name) === 'efectivo')?.id ?? null);
@@ -96,12 +102,25 @@ export default function PublishTripScreen() {
   // "Si el monto es 0 se publicará como gratis": se usa el método Gratuito del catálogo.
   const effectiveMethod = amount === 0 ? freeMethod : (methods.find((item) => item.id === methodId) ?? null);
 
+  // after marking the origin, the next tap marks the destination (if it is still missing)
+  const pickPoint = (target: PickTarget, point: GeoPoint) => {
+    if (target === 'origen') {
+      setOriginPoint(point);
+      if (!destinationPoint) setMapTarget('destino');
+    } else {
+      setDestinationPoint(point);
+    }
+  };
+
   const confirmActivation = async () => {
     if (!toActivate) return;
     setActivating(true);
+    setActivationError(null);
     try {
       setVehicles(await activateVehicle(toActivate.id));
       setToActivate(null);
+    } catch (cause) {
+      setActivationError(cause instanceof Error ? cause.message : 'No se pudo activar el vehículo.');
     } finally {
       setActivating(false);
     }
@@ -110,6 +129,7 @@ export default function PublishTripScreen() {
   const confirmTrip = async () => {
     if (!activeVehicle) return setError('Elige el vehículo que utilizas para realizar viajes');
     if (!origin.trim() || !destination.trim()) return setError('Indica el punto de partida y el destino del viaje');
+    if (!originPoint || !destinationPoint) return setError('Marca el origen y el destino en el mapa');
     if (!effectiveMethod) return setError('Define cómo se realizará el pago');
     setError(null);
     setPublishing(true);
@@ -117,13 +137,18 @@ export default function PublishTripScreen() {
       await publishTrip({
         vehicleId: activeVehicle.id,
         origin: { name: origin.trim() },
+        originPoint,
         destination: { name: destination.trim() },
+        destinationPoint,
         departureAt: buildDepartureAt(date, time),
         seats,
         costPerPassenger: amount,
         paymentMethodId: effectiveMethod.id,
       });
       router.replace('/publicar/publicado');
+    } catch (cause) {
+      // show the Backend's message (e.g. "El vehículo solo admite 4 pasajeros.")
+      setError(cause instanceof Error ? cause.message : 'No se pudo publicar el viaje.');
     } finally {
       setPublishing(false);
     }
@@ -185,16 +210,36 @@ export default function PublishTripScreen() {
         <>
           <SectionTitle title="Ruta" subtitle="Indica el punto de partida y el destino del viaje" />
           <FieldGroup style={styles.groupSpacing}>
-            <SearchField kind="origen" value={origin} placeholder="Origen" onChangeText={setOrigin} />
-            <SearchField kind="destino" value={destination} placeholder="Destino" onChangeText={setDestination} />
+            {/* focusing a field chooses which point the next tap on the map sets */}
+            <SearchField
+              kind="origen"
+              value={origin}
+              placeholder="Origen"
+              onChangeText={setOrigin}
+              inputProps={{ onFocus: () => setMapTarget('origen') }}
+            />
+            <SearchField
+              kind="destino"
+              value={destination}
+              placeholder="Destino"
+              onChangeText={setDestination}
+              inputProps={{ onFocus: () => setMapTarget('destino') }}
+            />
           </FieldGroup>
-          <PublishRouteMap
-            origin={origin.trim() || 'Origen'}
-            destination={destination.trim() || 'Destino'}
+          <LocationPickerMap
+            origin={originPoint}
+            destination={destinationPoint}
+            target={mapTarget}
+            onPick={pickPoint}
+            originLabel={origin.trim()}
+            destinationLabel={destination.trim()}
             style={styles.map}
           />
-          {/* Dato de muestra del diseño: no hay servicio de rutas que calcule distancia y tiempo. */}
-          <Text style={styles.note}>Distancia aproximada: 24 km  •  Tiempo estimado: 50 min</Text>
+          <Text style={styles.note}>
+            {Platform.OS === 'web'
+              ? 'El mapa interactivo solo está disponible en la app móvil.'
+              : `Toca el mapa para marcar el ${mapTarget === 'origen' ? 'origen' : 'destino'}. Puedes arrastrar los marcadores.`}
+          </Text>
         </>
       ) : null}
 
@@ -311,7 +356,11 @@ export default function PublishTripScreen() {
         confirmLabel="Activar"
         confirmVariant="primary"
         loading={activating}
-        onCancel={() => setToActivate(null)}
+        error={activationError}
+        onCancel={() => {
+          setToActivate(null);
+          setActivationError(null);
+        }}
         onConfirm={confirmActivation}
       />
     </Screen>

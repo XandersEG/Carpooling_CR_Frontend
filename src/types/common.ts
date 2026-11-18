@@ -18,6 +18,12 @@ export type Place = {
   detail?: string;
 };
 
+/** Geographic point picked on the map (decimal degrees). */
+export type GeoPoint = {
+  lat: number;
+  lng: number;
+};
+
 /** Referencia a una opción del catálogo "Métodos de Pago". */
 export type PaymentMethodRef = {
   id: Id;

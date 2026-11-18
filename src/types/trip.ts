@@ -1,4 +1,4 @@
-import type { Colones, Id, IsoDate, IsoDateTime, PaymentMethodRef, Place } from '@/src/types/common';
+import type { Colones, GeoPoint, Id, IsoDate, IsoDateTime, PaymentMethodRef, Place } from '@/src/types/common';
 import type { PersonSummary, Role } from '@/src/types/user';
 import type { TripVehicle } from '@/src/types/vehicle';
 
@@ -77,7 +77,10 @@ export type DriverTrip = Trip & {
 export type PublishTripInput = {
   vehicleId: Id;
   origin: Place;
+  /** Origin point picked on the map; the Backend requires coordinates. */
+  originPoint: GeoPoint;
   destination: Place;
+  destinationPoint: GeoPoint;
   departureAt: IsoDateTime;
   seats: number;
   costPerPassenger: Colones;
