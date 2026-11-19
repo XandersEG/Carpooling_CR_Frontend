@@ -250,7 +250,7 @@ EXPO_PUBLIC_API_URL=http://localhost:3000/api
 
 Al portal se entra con un administrador. El primero se crea desde la terminal del Backend (`npx tsx src/admin/crear-administrador.ts`); los demás se registran en la sección Usuarios. Sin sesión, `/admin` lleva a la pantalla de inicio de sesión.
 
-En Instituciones, cada institución tiene un acrónimo (TEC, UCR, UNA), que es el que usan las consultas y estadísticas. Se pide al agregar y al editar, se guarda en mayúsculas y no puede repetirse; las instituciones que todavía no lo tienen muestran "Sin registrar". El Backend valida el formato: de 2 a 10 letras o números, sin espacios ni tildes.
+En Instituciones, cada institución puede tener un acrónimo (TEC, UCR, UNA), que es el que usan las consultas y estadísticas. Es opcional: se escribe al agregar o al editar y, si el campo queda vacío, la institución muestra "Sin registrar". Se guarda en mayúsculas y no puede repetirse. El Backend valida el formato: de 2 a 10 letras o números, sin espacios ni tildes.
 
 En el área de administradores (sección Usuarios) todos ven la lista y pueden registrar administradores, pero cada uno solo edita y desactiva su propia cuenta: su fila es la única con botones. Al desactivarla o al cambiar su contraseña se cierra su sesión y el portal lo lleva al inicio de sesión con un aviso. El Backend aplica la misma regla.
 
