@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
-import NativeMapView, { Marker, Polyline, type MapPressEvent } from 'react-native-maps';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import NativeMapView, { Marker, Polyline, type MapPressEvent, type Region } from 'react-native-maps';
 
 import { colors, palette } from '@/src/constants/theme';
 
 import { MapView } from './MapView';
+import { MapZoomButtons, ZOOM_IN, ZOOM_OUT, zoomMap } from './MapZoomButtons';
 import { useAfterTransition } from './useAfterTransition';
 import type { GeoPoint } from '@/src/types/common';
 
@@ -63,6 +64,8 @@ export function RouteMap({
 }: RouteMapProps) {
   const mapRef = useRef<NativeMapView>(null);
   const ready = useAfterTransition();
+  // visible area, needed by the zoom buttons
+  const region = useRef<Region | null>(CENTRAL_VALLEY);
   const top = insets?.top ?? 0;
   const bottom = insets?.bottom ?? 0;
 
@@ -85,41 +88,53 @@ export function RouteMap({
   if (!ready) return <MapView style={[styles.map, style]} />;
 
   return (
-    <NativeMapView
-      ref={mapRef}
-      style={[styles.map, style]}
-      initialRegion={CENTRAL_VALLEY}
-      scrollEnabled={interactive}
-      zoomEnabled={interactive}
-      rotateEnabled={interactive}
-      pitchEnabled={interactive}
-      toolbarEnabled={false}
-      pointerEvents={interactive ? 'auto' : 'none'}
-      onPress={onPickPoint ? (event: MapPressEvent) => onPickPoint(toGeoPoint(event.nativeEvent.coordinate)) : undefined}
-    >
-      {origin ? (
-        <Marker coordinate={toLatLng(origin)} title={originLabel || 'Origen'} pinColor={colors.accentGreen} />
-      ) : null}
-      {destination ? (
-        <Marker coordinate={toLatLng(destination)} title={destinationLabel || 'Destino'} pinColor={palette.black} />
-      ) : null}
-      {pickup ? (
-        <Marker
-          coordinate={toLatLng(pickup)}
-          title={pickupLabel || 'Punto de recolección'}
-          pinColor={palette.terracotta}
-          draggable={Boolean(onPickPoint)}
-          onDragEnd={(event) => onPickPoint?.(toGeoPoint(event.nativeEvent.coordinate))}
+    <View style={[styles.map, style]}>
+      <NativeMapView
+        ref={mapRef}
+        style={StyleSheet.absoluteFill}
+        onRegionChangeComplete={(next) => {
+          region.current = next;
+        }}
+        initialRegion={CENTRAL_VALLEY}
+        scrollEnabled={interactive}
+        zoomEnabled={interactive}
+        rotateEnabled={interactive}
+        pitchEnabled={interactive}
+        toolbarEnabled={false}
+        pointerEvents={interactive ? 'auto' : 'none'}
+        onPress={onPickPoint ? (event: MapPressEvent) => onPickPoint(toGeoPoint(event.nativeEvent.coordinate)) : undefined}
+      >
+        {origin ? (
+          <Marker coordinate={toLatLng(origin)} title={originLabel || 'Origen'} pinColor={colors.accentGreen} />
+        ) : null}
+        {destination ? (
+          <Marker coordinate={toLatLng(destination)} title={destinationLabel || 'Destino'} pinColor={palette.black} />
+        ) : null}
+        {pickup ? (
+          <Marker
+            coordinate={toLatLng(pickup)}
+            title={pickupLabel || 'Punto de recolección'}
+            pinColor={palette.terracotta}
+            draggable={Boolean(onPickPoint)}
+            onDragEnd={(event) => onPickPoint?.(toGeoPoint(event.nativeEvent.coordinate))}
+          />
+        ) : null}
+        {origin && destination ? (
+          <Polyline
+            coordinates={[toLatLng(origin), toLatLng(destination)]}
+            strokeColor={colors.primary}
+            strokeWidth={3}
+          />
+        ) : null}
+      </NativeMapView>
+      {interactive ? (
+        <MapZoomButtons
+          style={{ top: top + 12 }}
+          onZoomIn={() => zoomMap(mapRef.current, region.current, ZOOM_IN)}
+          onZoomOut={() => zoomMap(mapRef.current, region.current, ZOOM_OUT)}
         />
       ) : null}
-      {origin && destination ? (
-        <Polyline
-          coordinates={[toLatLng(origin), toLatLng(destination)]}
-          strokeColor={colors.primary}
-          strokeWidth={3}
-        />
-      ) : null}
-    </NativeMapView>
+    </View>
   );
 }
 

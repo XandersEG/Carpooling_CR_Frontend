@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
-import MapView, { Marker, Polyline, type MapPressEvent } from 'react-native-maps';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import MapView, { Marker, Polyline, type MapPressEvent, type Region } from 'react-native-maps';
 
 import { MapView as StaticMap } from '@/components/mobile/MapView';
+import { MapZoomButtons, ZOOM_IN, ZOOM_OUT, zoomMap } from '@/components/mobile/MapZoomButtons';
 import { useAfterTransition } from '@/components/mobile/useAfterTransition';
 import { colors, palette } from '@/src/constants/theme';
 import type { GeoPoint } from '@/src/types/common';
@@ -61,6 +62,8 @@ export function LocationPickerMap({
 }: LocationPickerMapProps) {
   const mapRef = useRef<MapView>(null);
   const ready = useAfterTransition();
+  // visible area, needed by the zoom buttons
+  const region = useRef<Region | null>(INITIAL_REGION);
 
   // keep the picked points in view (e.g. after choosing a suggestion far from the current view)
   useEffect(() => {
@@ -85,33 +88,48 @@ export function LocationPickerMap({
   if (!ready) return <StaticMap style={[styles.map, style]} />;
 
   return (
-    <MapView ref={mapRef} style={[styles.map, style]} initialRegion={INITIAL_REGION} onPress={handlePress}>
-      {origin ? (
-        <Marker
-          coordinate={toLatLng(origin)}
-          title={originLabel || 'Origen'}
-          pinColor={colors.accentGreen}
-          draggable
-          onDragEnd={(event) => onPick('origen', toGeoPoint(event.nativeEvent.coordinate))}
-        />
-      ) : null}
-      {destination ? (
-        <Marker
-          coordinate={toLatLng(destination)}
-          title={destinationLabel || 'Destino'}
-          pinColor={palette.black}
-          draggable
-          onDragEnd={(event) => onPick('destino', toGeoPoint(event.nativeEvent.coordinate))}
-        />
-      ) : null}
-      {origin && destination ? (
-        <Polyline
-          coordinates={[toLatLng(origin), toLatLng(destination)]}
-          strokeColor={colors.primary}
-          strokeWidth={3}
-        />
-      ) : null}
-    </MapView>
+    <View style={[styles.map, style]}>
+      <MapView
+        ref={mapRef}
+        style={StyleSheet.absoluteFill}
+        initialRegion={INITIAL_REGION}
+        onPress={handlePress}
+        onRegionChangeComplete={(next) => {
+          region.current = next;
+        }}
+      >
+        {origin ? (
+          <Marker
+            coordinate={toLatLng(origin)}
+            title={originLabel || 'Origen'}
+            pinColor={colors.accentGreen}
+            draggable
+            onDragEnd={(event) => onPick('origen', toGeoPoint(event.nativeEvent.coordinate))}
+          />
+        ) : null}
+        {destination ? (
+          <Marker
+            coordinate={toLatLng(destination)}
+            title={destinationLabel || 'Destino'}
+            pinColor={palette.black}
+            draggable
+            onDragEnd={(event) => onPick('destino', toGeoPoint(event.nativeEvent.coordinate))}
+          />
+        ) : null}
+        {origin && destination ? (
+          <Polyline
+            coordinates={[toLatLng(origin), toLatLng(destination)]}
+            strokeColor={colors.primary}
+            strokeWidth={3}
+          />
+        ) : null}
+      </MapView>
+      <MapZoomButtons
+        style={{ top: topInset + 12 }}
+        onZoomIn={() => zoomMap(mapRef.current, region.current, ZOOM_IN)}
+        onZoomOut={() => zoomMap(mapRef.current, region.current, ZOOM_OUT)}
+      />
+    </View>
   );
 }
 
