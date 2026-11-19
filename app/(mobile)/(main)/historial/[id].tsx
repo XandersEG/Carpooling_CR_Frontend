@@ -1,32 +1,23 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
-import { DetailCard, DetailDivider, DetailRow, PersonCard } from '@/components/mobile/Detail';
+import { DetailCard, DetailDivider, DetailRow, NoticeBox, PersonCard } from '@/components/mobile/Detail';
 import { vehicleName } from '@/components/mobile/driver/format';
 import { PassengersEarningsCard } from '@/components/mobile/driver/PassengersEarningsCard';
+import { LoadState } from '@/components/mobile/passenger/LoadState';
+import { useServiceData } from '@/components/mobile/passenger/useServiceData';
 import { RouteVertical } from '@/components/mobile/Route';
 import { Screen } from '@/components/mobile/Screen';
 import { ScreenHeader } from '@/components/mobile/ScreenHeader';
-import { colors, spacing } from '@/src/constants/theme';
+import { spacing } from '@/src/constants/theme';
 import { getHistoryItem } from '@/src/services/tripService';
-import type { TripHistoryItem } from '@/src/types/trip';
 import { driverBadge, formatCost, formatDayMonth, formatPassengers, formatTime } from '@/src/utils/format';
 
 /** Detalle del historial: "Viaje de conductor" (2518:3471) o "Viaje de pasajero" (2518:3789). */
 export default function HistoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [item, setItem] = useState<TripHistoryItem | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    getHistoryItem(id).then((data) => {
-      if (active) setItem(data);
-    });
-    return () => {
-      active = false;
-    };
-  }, [id]);
+  const history = useServiceData(() => getHistoryItem(id), [id]);
+  const item = history.data;
 
   const asDriver = item?.role === 'conductor';
   const title = item ? (asDriver ? 'Viaje de conductor' : 'Viaje de pasajero') : '';
@@ -34,7 +25,7 @@ export default function HistoryDetailScreen() {
   if (!item) {
     return (
       <Screen header={<ScreenHeader title={title} />}>
-        <ActivityIndicator color={colors.primary} style={styles.loading} />
+        <LoadState loading={history.loading} error={history.error} />
       </Screen>
     );
   }
@@ -44,6 +35,11 @@ export default function HistoryDetailScreen() {
 
   return (
     <Screen scroll header={<ScreenHeader title={title} />} contentStyle={styles.content}>
+      {trip.status === 'cancelado' ? (
+        <NoticeBox
+          text={`Este viaje fue cancelado${item.cancellationReason ? `: ${item.cancellationReason}` : '.'}`}
+        />
+      ) : null}
       {!asDriver ? <PersonCard name={trip.driver.fullName} badge={driverLabel} /> : null}
 
       <DetailCard title={vehicleName(trip.vehicle)}>
@@ -58,6 +54,7 @@ export default function HistoryDetailScreen() {
         <DetailRow label="Fecha" value={formatDayMonth(trip.departureAt)} />
         <DetailRow label="Hora de salida" value={formatTime(trip.departureAt)} />
         {trip.arrivalAt ? <DetailRow label="Hora de llegada" value={formatTime(trip.arrivalAt)} /> : null}
+        {!asDriver && item.pickupPoint ? <DetailRow label="Punto de recogida" value={item.pickupPoint.name} /> : null}
       </DetailCard>
 
       {asDriver ? (
@@ -75,8 +72,5 @@ export default function HistoryDetailScreen() {
 const styles = StyleSheet.create({
   content: {
     gap: spacing.xs,
-  },
-  loading: {
-    marginTop: spacing.xl * 2,
   },
 });

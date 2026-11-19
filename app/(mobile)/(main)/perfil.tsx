@@ -14,7 +14,8 @@ import { Avatar } from '@/components/shared/Avatar';
 import { Button } from '@/components/shared/Button';
 import { Card } from '@/components/shared/Card';
 import { colors, fonts, palette, radius, spacing, typography } from '@/src/constants/theme';
-import { listCatalog } from '@/src/services/admin/catalogService';
+import { logout } from '@/src/services/authService';
+import { listGenders } from '@/src/services/catalogService';
 import { getProfile, updateProfile } from '@/src/services/profileService';
 import type { Role, UserProfile } from '@/src/types/user';
 import { now } from '@/src/utils/clock';
@@ -25,6 +26,7 @@ type FormValues = {
   gender: string | null;
   birthDate: string;
   roles: Role[];
+  phone: string;
 };
 
 type FormErrors = Partial<Record<keyof FormValues, string>>;
@@ -35,6 +37,7 @@ function toForm(profile: UserProfile): FormValues {
     gender: profile.gender || null,
     birthDate: isoToDisplayDate(profile.birthDate),
     roles: profile.roles,
+    phone: profile.phone ?? '',
   };
 }
 
@@ -45,6 +48,9 @@ function validate(values: FormValues): FormErrors {
   const birthDate = displayToIsoDate(values.birthDate);
   if (!birthDate || birthDate > toIsoDate(now())) errors.birthDate = 'Ingresa una fecha válida.';
   if (values.roles.length === 0) errors.roles = 'Selecciona al menos un rol.';
+  if (values.phone.trim() && !/^\+?[0-9 -]{8,20}$/.test(values.phone.trim())) {
+    errors.phone = 'Ingresa un teléfono válido (al menos 8 dígitos).';
+  }
   return errors;
 }
 
@@ -55,19 +61,25 @@ function validate(values: FormValues): FormErrors {
  */
 export default function PerfilScreen() {
   const profile = useServiceData(getProfile, []);
-  const genders = useServiceData(() => listCatalog('opciones-genero'), []);
+  const genders = useServiceData(listGenders, []);
   const [values, setValues] = useState<FormValues | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    await logout();
+    // sin sesión, el layout de la app regresa al inicio de sesión
+    router.replace('/login');
+  }
 
   useEffect(() => {
     if (profile.data) setValues(toForm(profile.data));
   }, [profile.data]);
 
-  const genderOptions: SelectOption<string>[] = (genders.data ?? [])
-    .filter((item) => item.active)
-    .map((item) => ({ value: item.name, label: item.name }));
+  const genderOptions: SelectOption<string>[] = (genders.data ?? []).map((name) => ({ value: name, label: name }));
 
   function set<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setValues((current) => (current ? { ...current, [key]: value } : current));
@@ -88,6 +100,7 @@ export default function PerfilScreen() {
         gender: values.gender ?? undefined,
         birthDate: displayToIsoDate(values.birthDate) ?? undefined,
         roles: values.roles,
+        phone: values.phone.trim(),
       });
       setValues(toForm(updated));
       setMessage('Cambios guardados.');
@@ -132,6 +145,16 @@ export default function PerfilScreen() {
               textContentType="name"
             />
             <FormField label="Correo Institucional" value={user.email} editable={false} />
+            <FormField
+              label="Teléfono (opcional)"
+              placeholder="8888-8888"
+              value={values.phone}
+              onChangeText={(text) => set('phone', text)}
+              error={errors.phone}
+              keyboardType="phone-pad"
+              autoComplete="tel"
+              textContentType="telephoneNumber"
+            />
             <SelectField
               label="Género"
               value={values.gender}
@@ -174,6 +197,13 @@ export default function PerfilScreen() {
             ) : null}
           </View>
           {message ? <Text style={styles.message}>{message}</Text> : null}
+          <Button
+            title="Cerrar sesión"
+            variant="outline"
+            onPress={handleLogout}
+            loading={loggingOut}
+            style={styles.logoutButton}
+          />
         </>
       ) : (
         <LoadState loading={profile.loading} error={profile.error} />
@@ -262,6 +292,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.cairoRegular,
     fontSize: 10,
     color: colors.textPrimary,
+  },
+  logoutButton: {
+    marginTop: spacing.xl,
+    alignSelf: 'center',
+    minWidth: 200,
   },
   message: {
     ...typography.textSmall,

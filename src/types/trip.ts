@@ -129,4 +129,8 @@ export type TripHistoryItem = {
   amount: Colones;
   /** Solo como conductor: pasajeros que viajaron. */
   passengers?: JoinRequest[];
+  /** Solo como pasajero: punto donde lo recogieron. */
+  pickupPoint?: Place;
+  /** Motivo que indicó el conductor si el viaje se canceló. */
+  cancellationReason?: string;
 };

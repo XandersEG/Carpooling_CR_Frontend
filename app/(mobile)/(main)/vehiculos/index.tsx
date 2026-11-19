@@ -21,13 +21,22 @@ export default function VehiclesScreen() {
   const [deleting, setDeleting] = useState(false);
   // Backend error on delete (e.g. the vehicle has trips)
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // error al cargar la lista (sin conexión, sesión vencida...)
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      listMyVehicles().then((list) => {
-        if (active) setVehicles(list);
-      });
+      setLoadError(null);
+      listMyVehicles()
+        .then((list) => {
+          if (active) setVehicles(list);
+        })
+        .catch((cause: unknown) => {
+          if (!active) return;
+          setVehicles([]);
+          setLoadError(cause instanceof Error ? cause.message : 'No se pudieron cargar tus vehículos.');
+        });
       return () => {
         active = false;
       };
@@ -66,8 +75,13 @@ export default function VehiclesScreen() {
     >
       <Text style={styles.subtitle}>Gestiona los vehículos que utilizas para publicar viajes</Text>
       {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
+      {loadError ? <Text style={styles.error}>{loadError}</Text> : null}
       {vehicles === null ? (
         <ActivityIndicator color={colors.primary} style={styles.loading} />
+      ) : vehicles.length === 0 && !loadError ? (
+        <Text style={styles.empty}>
+          Aún no tienes vehículos registrados. Agrega uno para poder publicar viajes.
+        </Text>
       ) : (
         vehicles.map((vehicle) => (
           <VehicleCard
@@ -113,6 +127,12 @@ const styles = StyleSheet.create({
   },
   loading: {
     marginTop: spacing.xl * 2,
+  },
+  empty: {
+    ...typography.textSecondary,
+    marginTop: spacing.xl,
+    textAlign: 'center',
+    color: colors.textSecondary,
   },
   error: {
     ...typography.textSmall,

@@ -1,4 +1,4 @@
-import type { Id, IsoDate, Place } from '@/src/types/common';
+import type { GeoPoint, Id, IsoDate, IsoDateTime, Place } from '@/src/types/common';
 
 /** Un usuario puede tener uno o ambos roles. */
 export type Role = 'conductor' | 'pasajero';
@@ -17,6 +17,10 @@ export type UserProfile = {
   roles: Role[];
   institutionName: string;
   avatarUrl?: string;
+  /** Teléfono de contacto (opcional). */
+  phone?: string;
+  /** Fecha de creación de la cuenta. */
+  memberSince?: IsoDateTime;
 };
 
 /** Datos mínimos de una persona mostrados en tarjetas y detalles. */
@@ -33,4 +37,6 @@ export type PersonSummary = {
 /** Lugar frecuente del usuario (pantalla de inicio). */
 export type SavedPlace = Place & {
   id: Id;
+  /** Punto en el mapa, para buscar viajes hacia ese lugar. */
+  point?: GeoPoint;
 };

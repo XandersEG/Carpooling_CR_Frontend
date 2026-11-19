@@ -1,19 +1,16 @@
 /**
  * Vehículos del conductor ("Mis vehículos", "Datos del vehículo").
  *
- * Uses the Backend (`/driver/vehicles`) when `EXPO_PUBLIC_USE_MOCKS=false`;
- * otherwise it uses the sample data in src/services/mock.
+ * Usa el Backend (`/driver/vehicles`): solo devuelve los vehículos del usuario
+ * con la sesión iniciada.
  *
- * The Backend does not store `year` or `photoUrls` yet: with the real API they
- * are not sent and vehicles come back without photos.
+ * El Backend no guarda `year` ni `photoUrls` todavía: no se envían y los
+ * vehículos vuelven sin fotos.
  */
 import type { Id } from '@/src/types/common';
 import type { Vehicle, VehicleInput } from '@/src/types/vehicle';
 
 import { apiRequest } from './apiClient';
-import { USE_MOCK_DATA } from './config';
-import { db } from './mock/db';
-import { createId, notFound, respond } from './mock/utils';
 
 /** Vehicle as returned by `/driver/vehicles`. */
 type VehicleResponse = {
@@ -64,76 +61,33 @@ function vehiclePath(id: Id): string {
   return `${BASE_PATH}/${encodeURIComponent(id)}`;
 }
 
-function findVehicle(id: Id): Vehicle {
-  const vehicle = db.vehicles.find((item) => item.id === id);
-  if (!vehicle) throw notFound('Vehículo', id);
-  return vehicle;
-}
-
+/** Vehículos del usuario con la sesión iniciada; el activo aparece primero. */
 export async function listMyVehicles(): Promise<Vehicle[]> {
-  if (!USE_MOCK_DATA) {
-    const response = await apiRequest<VehicleResponse[]>(BASE_PATH);
-    return response.map(toVehicle);
-  }
-  return respond(db.vehicles);
+  const response = await apiRequest<VehicleResponse[]>(BASE_PATH);
+  return response.map(toVehicle).sort((a, b) => Number(b.active) - Number(a.active));
 }
 
 export async function getVehicle(id: Id): Promise<Vehicle> {
-  if (!USE_MOCK_DATA) {
-    return toVehicle(await apiRequest<VehicleResponse>(vehiclePath(id)));
-  }
-  return respond(findVehicle(id));
+  return toVehicle(await apiRequest<VehicleResponse>(vehiclePath(id)));
 }
 
 export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
-  if (!USE_MOCK_DATA) {
-    const response = await apiRequest<VehicleResponse>(BASE_PATH, { method: 'POST', body: toRequest(input) });
-    return toVehicle(response);
-  }
-
-  const vehicle: Vehicle = {
-    ...input,
-    id: createId('v'),
-    photoUrls: input.photoUrls ?? [],
-    active: db.vehicles.length === 0,
-  };
-  db.vehicles.push(vehicle);
-  return respond(vehicle);
+  const response = await apiRequest<VehicleResponse>(BASE_PATH, { method: 'POST', body: toRequest(input) });
+  return toVehicle(response);
 }
 
 export async function updateVehicle(id: Id, input: VehicleInput): Promise<Vehicle> {
-  if (!USE_MOCK_DATA) {
-    const response = await apiRequest<VehicleResponse>(vehiclePath(id), { method: 'PATCH', body: toRequest(input) });
-    return toVehicle(response);
-  }
-
-  const vehicle = findVehicle(id);
-  Object.assign(vehicle, input);
-  return respond(vehicle);
+  const response = await apiRequest<VehicleResponse>(vehiclePath(id), { method: 'PATCH', body: toRequest(input) });
+  return toVehicle(response);
 }
 
 export async function deleteVehicle(id: Id): Promise<void> {
-  if (!USE_MOCK_DATA) {
-    await apiRequest<void>(vehiclePath(id), { method: 'DELETE' });
-    return;
-  }
-
-  findVehicle(id);
-  db.vehicles = db.vehicles.filter((item) => item.id !== id);
-  await respond(undefined);
+  await apiRequest<void>(vehiclePath(id), { method: 'DELETE' });
 }
 
 /** "¿Activar vehículo?": solo un vehículo puede estar activo. Returns the updated list. */
 export async function activateVehicle(id: Id): Promise<Vehicle[]> {
-  if (!USE_MOCK_DATA) {
-    await apiRequest<VehicleResponse>(`${vehiclePath(id)}/activate`, { method: 'PATCH' });
-    // the Backend deactivates the other vehicles, so the whole list is reloaded
-    return listMyVehicles();
-  }
-
-  findVehicle(id);
-  db.vehicles.forEach((item) => {
-    item.active = item.id === id;
-  });
-  return respond(db.vehicles);
+  await apiRequest<VehicleResponse>(`${vehiclePath(id)}/activate`, { method: 'PATCH' });
+  // the Backend deactivates the other vehicles, so the whole list is reloaded
+  return listMyVehicles();
 }

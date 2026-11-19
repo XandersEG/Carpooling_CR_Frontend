@@ -18,7 +18,8 @@ import { getGreetingName, getSavedPlaces } from '@/src/services/profileService';
 export default function InicioScreen() {
   // real name of the logged-in user (GET /auth/me)
   const greetingName = useServiceData(getGreetingName, []);
-  const places = useServiceData(getSavedPlaces, []);
+  // most used places in the user's own trips (GET /me/frequent-places); reloaded after each trip
+  const places = useServiceData(getSavedPlaces, [], { reloadOnFocus: true });
   // destination marked on the map ("¿A dónde vas?" with a tap instead of typing)
   const [destination, setDestination] = useState<{ name: string; point: GeoPoint } | null>(null);
   // top of the visible map strip, so the zoom buttons sit inside it
@@ -126,9 +127,26 @@ export default function InicioScreen() {
                 key={place.id}
                 name={place.name}
                 detail={place.detail}
-                onPress={() => router.push({ pathname: '/buscar', params: { destination: place.name } })}
+                onPress={() =>
+                  router.push({
+                    pathname: '/buscar',
+                    params: place.point
+                      ? {
+                          destination: place.name,
+                          destinationLat: String(place.point.lat),
+                          destinationLng: String(place.point.lng),
+                        }
+                      : { destination: place.name },
+                  })
+                }
               />
             ))}
+            {places.data && places.data.length === 0 ? (
+              <Text style={styles.emptyPlaces}>
+                Aquí aparecerán los lugares a los que viajas con más frecuencia.
+              </Text>
+            ) : null}
+            {places.error ? <Text style={styles.emptyPlaces}>{places.error}</Text> : null}
           </View>
         </ScrollView>
       </View>
@@ -231,6 +249,10 @@ const styles = StyleSheet.create({
   shortcuts: {
     flexDirection: 'row',
     gap: 11,
+  },
+  emptyPlaces: {
+    ...typography.textSecondary,
+    color: colors.textSecondary,
   },
   sectionTitle: {
     ...typography.textStrong,

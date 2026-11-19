@@ -90,10 +90,10 @@ Carpooling_CR_Frontend/
 │   ├── shared/           # Usados en ambas plataformas
 │   ├── mobile/           # Solo app móvil
 │   └── web/              # Solo portal web
-├── docs/design/          # Análisis del diseño de Figma y plan de implementación
+├── docs/                 # Casos de uso, manual de usuario y análisis del diseño (docs/design)
 ├── src/
 │   ├── features/         # Funcionalidades del sistema
-│   ├── services/         # Servicios y comunicación con API (por ahora simulados en services/mock)
+│   ├── services/         # Servicios y comunicación con el API (la app móvil usa solo el Backend real)
 │   ├── hooks/            # Hooks reutilizables
 │   ├── constants/        # Constantes generales y tokens de diseño (theme.ts)
 │   └── types/            # Tipos e interfaces TypeScript

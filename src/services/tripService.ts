@@ -1,13 +1,11 @@
 /**
  * Viajes desde la perspectiva del pasajero: búsqueda, solicitud para unirse,
- * "Mis Viajes" e historial.
- *
- * La búsqueda, el detalle del viaje, la solicitud para unirse, "Mis Viajes" y
- * "Resumen del viaje" usan el Backend cuando `EXPO_PUBLIC_USE_MOCKS=false`.
- * Provisional: lo demás sigue simulado.
+ * "Mis Viajes" e "Historial de viajes" (como pasajero y como conductor).
+ * Todo usa el Backend.
  */
 import type { GeoPoint, Id, Place } from '@/src/types/common';
 import type {
+  JoinRequest,
   JoinRequestStatus,
   PassengerTrip,
   Trip,
@@ -17,9 +15,6 @@ import type {
 } from '@/src/types/trip';
 
 import { apiRequest } from './apiClient';
-import { USE_MOCK_DATA } from './config';
-import { db } from './mock/db';
-import { createId, notFound, respond } from './mock/utils';
 
 /** Costa Rica's UTC offset; dates and times picked in the app are local to it. */
 const CR_OFFSET = '-06:00';
@@ -200,29 +195,12 @@ function toSearchQuery(params: TripSearchParams): string {
 
 /** Scheduled trips with free seats that match the search (never the user's own). */
 export async function searchTrips(params: TripSearchParams): Promise<Trip[]> {
-  if (!USE_MOCK_DATA) {
-    const response = await apiRequest<TripListItemResponse[]>(`/passenger/trips?${toSearchQuery(params)}`);
-    return response.map(toListTrip);
-  }
-  // Simulado: devuelve siempre los mismos resultados, sin aplicar los filtros.
-  return respond(db.availableTrips.filter((trip) => trip.status === 'programado'));
+  const response = await apiRequest<TripListItemResponse[]>(`/passenger/trips?${toSearchQuery(params)}`);
+  return response.map(toListTrip);
 }
 
 export async function getTrip(id: Id): Promise<Trip> {
-  if (!USE_MOCK_DATA) {
-    return toDetailTrip(await apiRequest<TripDetailResponse>(`/passenger/trips/${encodeURIComponent(id)}`));
-  }
-
-  const trip =
-    db.availableTrips.find((item) => item.id === id) ??
-    db.passengerTrips.find((item) => item.trip.id === id)?.trip;
-  if (!trip) throw notFound('Viaje', id);
-  return respond(trip);
-}
-
-/** Simulado: los mismos puntos de recogida para cualquier viaje. */
-export async function getPickupPoints(_tripId: Id): Promise<Place[]> {
-  return respond(db.pickupPoints);
+  return toDetailTrip(await apiRequest<TripDetailResponse>(`/passenger/trips/${encodeURIComponent(id)}`));
 }
 
 /** Pickup point chosen by the passenger: a name for the driver and its map point. */
@@ -237,62 +215,137 @@ type JoinRequestResponse = {
 
 /** "Solicitar unirme" + "Confirmar punto de recolección". */
 export async function requestToJoin(tripId: Id, pickupPoint: PickupChoice): Promise<PassengerTrip> {
-  if (!USE_MOCK_DATA) {
-    const request = await apiRequest<JoinRequestResponse>(
-      `/passenger/trips/${encodeURIComponent(tripId)}/join-requests`,
-      {
-        method: 'POST',
-        body: { nombre: pickupPoint.name, lat: pickupPoint.point.lat, lng: pickupPoint.point.lng },
-      },
-    );
-    return {
-      requestId: String(request.id),
-      status: 'pendiente',
-      pickupPoint: { name: pickupPoint.name, detail: pickupPoint.detail },
-      trip: await getTrip(tripId),
-    };
-  }
-
-  const trip = db.availableTrips.find((item) => item.id === tripId);
-  if (!trip) throw notFound('Viaje', tripId);
-
-  const passengerTrip: PassengerTrip = {
-    requestId: createId('r'),
+  const request = await apiRequest<JoinRequestResponse>(
+    `/passenger/trips/${encodeURIComponent(tripId)}/join-requests`,
+    {
+      method: 'POST',
+      body: { nombre: pickupPoint.name, lat: pickupPoint.point.lat, lng: pickupPoint.point.lng },
+    },
+  );
+  return {
+    requestId: String(request.id),
     status: 'pendiente',
-    pickupPoint,
-    trip,
+    pickupPoint: { name: pickupPoint.name, detail: pickupPoint.detail },
+    trip: await getTrip(tripId),
   };
-  db.passengerTrips.unshift(passengerTrip);
-  return respond(passengerTrip);
 }
 
 export async function getMyTrips(): Promise<PassengerTrip[]> {
-  if (!USE_MOCK_DATA) {
-    const requests = await apiRequest<PassengerRequestResponse[]>('/passenger/requests');
-    return requests.map(toPassengerTrip);
-  }
-
-  return respond(db.passengerTrips);
+  const requests = await apiRequest<PassengerRequestResponse[]>('/passenger/requests');
+  return requests.map(toPassengerTrip);
 }
 
 export async function getMyTrip(requestId: Id): Promise<PassengerTrip> {
-  if (!USE_MOCK_DATA) {
-    return toPassengerTrip(
-      await apiRequest<PassengerRequestResponse>(`/passenger/requests/${encodeURIComponent(requestId)}`),
-    );
-  }
-
-  const passengerTrip = db.passengerTrips.find((item) => item.requestId === requestId);
-  if (!passengerTrip) throw notFound('Solicitud', requestId);
-  return respond(passengerTrip);
+  return toPassengerTrip(
+    await apiRequest<PassengerRequestResponse>(`/passenger/requests/${encodeURIComponent(requestId)}`),
+  );
 }
 
+/** Viaje dentro de un elemento de `GET /history`. */
+type HistoryTripResponse = {
+  id: number;
+  estado: 'FINALIZADO' | 'CANCELADO';
+  origen: ApiPlace;
+  destino: ApiPlace;
+  salida: string;
+  inicioReal: string | null;
+  finReal: string | null;
+  motivoCancelacion: string | null;
+  cuposTotales: number;
+  costo: number;
+  metodoPago: { id: number; nombre: string };
+  conductor: {
+    id: number;
+    nombre: string;
+    fotoUrl: string | null;
+    genero: string | null;
+    institucion: string | null;
+  };
+  vehiculo: { marca: string; modelo: string; color: string; placa: string; capacidad: number };
+};
+
+/** Elemento de `GET /history` y `GET /history/:id`. */
+type HistoryItemResponse = {
+  /** `c-<viajeId>` como conductor, `p-<solicitudId>` como pasajero. */
+  id: string;
+  rol: 'conductor' | 'pasajero';
+  monto: number;
+  viaje: HistoryTripResponse;
+  /** Solo como pasajero: dónde lo recogieron. */
+  puntoRecogida?: { nombre: string };
+  /** Solo como conductor: pasajeros que iban en el viaje. */
+  pasajeros?: {
+    solicitudId: number;
+    pasajeroId: number;
+    nombre: string;
+    fotoUrl: string | null;
+    puntoRecogida: { nombre: string };
+    monto: number;
+  }[];
+};
+
+function toHistoryItem(item: HistoryItemResponse): TripHistoryItem {
+  const { viaje } = item;
+  const tripId = String(viaje.id);
+  const paymentMethod = { id: String(viaje.metodoPago.id), name: viaje.metodoPago.nombre };
+  const passengers: JoinRequest[] | undefined = item.pasajeros?.map((passenger) => ({
+    id: String(passenger.solicitudId),
+    tripId,
+    passenger: {
+      id: String(passenger.pasajeroId),
+      fullName: passenger.nombre,
+      avatarUrl: passenger.fotoUrl ?? undefined,
+    },
+    pickupPoint: { name: passenger.puntoRecogida.nombre },
+    amount: passenger.monto,
+    paymentMethod,
+    status: 'aprobada',
+  }));
+
+  return {
+    id: item.id,
+    role: item.rol,
+    amount: item.monto,
+    passengers,
+    pickupPoint: item.puntoRecogida ? { name: item.puntoRecogida.nombre } : undefined,
+    cancellationReason: viaje.motivoCancelacion ?? undefined,
+    trip: {
+      id: tripId,
+      driver: {
+        id: String(viaje.conductor.id),
+        fullName: viaje.conductor.nombre,
+        gender: viaje.conductor.genero ?? undefined,
+        verifiedInstitution: viaje.conductor.institucion ?? undefined,
+        avatarUrl: viaje.conductor.fotoUrl ?? undefined,
+      },
+      vehicle: {
+        brand: viaje.vehiculo.marca,
+        model: viaje.vehiculo.modelo,
+        color: viaje.vehiculo.color,
+        plate: viaje.vehiculo.placa,
+        capacity: viaje.vehiculo.capacidad,
+      },
+      origin: { name: viaje.origen.nombre },
+      destination: { name: viaje.destino.nombre },
+      departureAt: viaje.salida,
+      arrivalAt: viaje.finReal ?? undefined,
+      costPerPassenger: viaje.costo,
+      paymentMethod,
+      availableSeats: 0,
+      status: STATUS_FROM_API[viaje.estado],
+      originPoint: { lat: viaje.origen.lat, lng: viaje.origen.lng },
+      destinationPoint: { lat: viaje.destino.lat, lng: viaje.destino.lng },
+    },
+  };
+}
+
+/** Viajes finalizados o cancelados del usuario, como conductor y como pasajero (el más reciente primero). */
 export async function getTripHistory(): Promise<TripHistoryItem[]> {
-  return respond(db.tripHistory);
+  const items = await apiRequest<HistoryItemResponse[]>('/history');
+  return items.map(toHistoryItem);
 }
 
+/** Un viaje del historial; `id` es el que devuelve `getTripHistory`. */
 export async function getHistoryItem(id: Id): Promise<TripHistoryItem> {
-  const item = db.tripHistory.find((entry) => entry.id === id);
-  if (!item) throw notFound('Viaje del historial', id);
-  return respond(item);
+  return toHistoryItem(await apiRequest<HistoryItemResponse>(`/history/${encodeURIComponent(id)}`));
 }

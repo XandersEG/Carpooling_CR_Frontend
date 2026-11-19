@@ -1,5 +1,4 @@
 import { formatSlot } from '@/components/mobile/TimeSlotPicker';
-import { USE_MOCK_DATA } from '@/src/services/config';
 import type { GeoPoint, IsoDate } from '@/src/types/common';
 import type { TripSearchParams } from '@/src/types/trip';
 import { now } from '@/src/utils/clock';
@@ -23,15 +22,11 @@ export type SearchRouteParams = {
 /** Última búsqueda realizada en la sesión (resumen de "Mis Viajes"). */
 let lastSearch: TripSearchParams | null = null;
 
-/**
- * Valores iniciales de "Buscar rutas". Con datos simulados se usan los de las
- * variables de Figma (`busqueda/origen` "TEC Cartago", `busqueda/destino`
- * "San José", "Hoy", "6:30 a. m.").
- */
+/** Valores iniciales de "Buscar rutas": sin lugares, hoy a las 6:30 a. m. */
 export function defaultSearch(): TripSearchParams {
   return {
-    origin: USE_MOCK_DATA ? 'TEC Cartago' : '',
-    destination: USE_MOCK_DATA ? 'San José' : '',
+    origin: '',
+    destination: '',
     date: toIsoDate(now()),
     time: '06:30',
   };

@@ -6,7 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormField } from '@/components/mobile/Form';
 import { AuthButton, AuthLink } from '@/components/mobile/passenger/Auth';
 import { authColors, colors, fonts, typography } from '@/src/constants/theme';
-import { login } from '@/src/services/authService';
+import { ApiError } from '@/src/services/apiClient';
+import { login, resendVerification } from '@/src/services/authService';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -38,6 +39,24 @@ export default function LoginScreen() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // la cuenta existe pero no ha verificado su correo (403 del Backend)
+  const [unverified, setUnverified] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+
+  async function handleResend() {
+    if (resending) return;
+    setResending(true);
+    setResendMessage(null);
+    try {
+      await resendVerification(email);
+      setResendMessage('Te enviamos un enlace nuevo. Revisa tu correo institucional.');
+    } catch (error) {
+      setResendMessage(error instanceof Error ? error.message : 'No se pudo reenviar el enlace.');
+    } finally {
+      setResending(false);
+    }
+  }
 
   async function handleLogin() {
     // Enter sigue activo mientras el botón está deshabilitado, y cada envío abriría otra sesión.
@@ -46,6 +65,8 @@ export default function LoginScreen() {
     const validationErrors = validate(email, password);
     setErrors(validationErrors);
     setFormError(null);
+    setUnverified(false);
+    setResendMessage(null);
 
     if (Object.keys(validationErrors).length > 0) {
       return;
@@ -56,6 +77,7 @@ export default function LoginScreen() {
       await login({ correo: email.trim(), password });
       router.replace('/inicio');
     } catch (error) {
+      setUnverified(error instanceof ApiError && error.status === 403);
       setFormError(error instanceof Error ? error.message : 'No se pudo iniciar sesión.');
     } finally {
       setLoading(false);
@@ -116,6 +138,12 @@ export default function LoginScreen() {
             </View>
 
             {formError ? <Text style={styles.formError}>{formError}</Text> : null}
+            {unverified ? (
+              <View style={styles.resend}>
+                <AuthLink label={resending ? 'Enviando…' : 'Reenviar enlace de verificación'} onPress={handleResend} />
+                {resendMessage ? <Text style={styles.resendMessage}>{resendMessage}</Text> : null}
+              </View>
+            ) : null}
 
             <View style={styles.submit}>
               <AuthButton title="Iniciar sesión" onPress={handleLogin} loading={loading} />
@@ -185,6 +213,15 @@ const styles = StyleSheet.create({
   },
   submit: {
     marginTop: 28,
+  },
+  resend: {
+    marginTop: 12,
+    gap: 8,
+    alignItems: 'flex-start',
+  },
+  resendMessage: {
+    ...typography.textSecondary,
+    color: colors.textSubtitle,
   },
   footer: {
     marginTop: 'auto',
