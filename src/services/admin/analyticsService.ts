@@ -187,8 +187,6 @@ function porRangoEdad(filas: EstadisticasRespuesta['rangoEdad'], genero: string)
   return conteos.map((fila) => ({ ...fila, percent: porcentaje(fila.count, total) }));
 }
 
-
-
 export type StatisticsFilters = {
   institucionId?: number;
   desde?: IsoDate | null;
@@ -223,4 +221,30 @@ export async function getStatistics(
 
 export async function listGenderFilterOptions(): Promise<string[]> {
   return respond(fixtures.genderFilterOptions);
+}
+
+export async function listTrips(filters: TableFilters & DateRange): Promise<TripListEntry[]> {
+  // Consultar backend
+  const rawTrips = await consultarListadoViajes({
+    desde: filters.from,
+    hasta: filters.to,
+    institucionId: filters.institutionId,
+  });
+
+  // Transformar respuesta del backend al tipo TripListEntry
+  return rawTrips
+    .map((trip) => ({
+      id: `V-${trip.id}`, // Generar código visible
+      code: `V-${trip.id}`,
+      departureAt: trip.fechaHoraSalida,
+      institution: institutionCodeFromId(trip.institucionId), // Concertir ID a codigo
+      driverName: `${trip.conductorNombre} ${trip.conductorApellidos}`,
+      origin: trip.origenNombre,
+      destination: trip.destinoNombre,
+      amount: trip.costo,
+      stops: [trip.origenNombre, trip.destinoNombre], // Simplificado, ajusta según necesidad
+      vehicle: `${trip.marca} ${trip.modelo} - ${trip.placa}`,
+      passengers: [], // Necesita consulta separada o incluirse en el backend
+    }))
+    .filter((trip) => matches(trip.driverName, trip.institution, filters));
 }
