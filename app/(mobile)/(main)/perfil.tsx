@@ -14,8 +14,7 @@ import { Avatar } from '@/components/shared/Avatar';
 import { Button } from '@/components/shared/Button';
 import { Card } from '@/components/shared/Card';
 import { colors, fonts, palette, radius, spacing, typography } from '@/src/constants/theme';
-import { listCatalog } from '@/src/services/admin/catalogService';
-import { getProfile, updateProfile } from '@/src/services/profileService';
+import { getProfile, listGenderOptions, updateProfile } from '@/src/services/profileService';
 import type { Role, UserProfile } from '@/src/types/user';
 import { now } from '@/src/utils/clock';
 import { toIsoDate } from '@/src/utils/format';
@@ -55,7 +54,7 @@ function validate(values: FormValues): FormErrors {
  */
 export default function PerfilScreen() {
   const profile = useServiceData(getProfile, []);
-  const genders = useServiceData(() => listCatalog('opciones-genero'), []);
+  const genders = useServiceData(listGenderOptions, []);
   const [values, setValues] = useState<FormValues | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
@@ -65,9 +64,7 @@ export default function PerfilScreen() {
     if (profile.data) setValues(toForm(profile.data));
   }, [profile.data]);
 
-  const genderOptions: SelectOption<string>[] = (genders.data ?? [])
-    .filter((item) => item.active)
-    .map((item) => ({ value: item.name, label: item.name }));
+  const genderOptions: SelectOption<string>[] = (genders.data ?? []).map((name) => ({ value: name, label: name }));
 
   function set<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setValues((current) => (current ? { ...current, [key]: value } : current));
