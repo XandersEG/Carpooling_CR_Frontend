@@ -10,6 +10,7 @@ export type InstitutionCode = 'TEC' | 'UCR' | 'UNA' | 'UNED';
 export type InstitutionFilterOption = {
   label: string;
   code: InstitutionCode | null;
+  id?: number;
 };
 
 /** Fila de las consultas "Top N" (conductores, puntos o usuarios). */
@@ -17,7 +18,7 @@ export type RankingEntry = {
   id: Id;
   /** Conductor, punto de recogida o usuario. */
   name: string;
-  institution: InstitutionCode;
+  institution: string;
   /** Viajes brindados o registrados. */
   trips: number;
 };

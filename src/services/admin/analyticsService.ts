@@ -22,6 +22,7 @@ import { toIsoDate } from '@/src/utils/format';
 import * as fixtures from '../mock/fixtures/analytics';
 import { respond } from '../mock/utils';
 import { consultarUsuariosNuevos } from '@/src/features/admin/api';
+import { consultarTopConductores } from '@/src/features/admin/api';
 
 import { obtenerEstadisticas } from '@/src/features/admin/api';
 import { USE_MOCK_DATA } from '../config';
@@ -30,6 +31,7 @@ export type RankingKind = 'conductores' | 'puntos' | 'usuarios';
 
 export type TableFilters = {
   institution?: InstitutionCode | null;
+  institutionId?: number;
   search?: string;
 };
 
@@ -44,7 +46,7 @@ const rankings: Record<RankingKind, RankingQuery> = {
   usuarios: fixtures.mostActiveUsers,
 };
 
-function matches(name: string, institution: InstitutionCode, filters: TableFilters): boolean {
+function matches(name: string, institution: string, filters: TableFilters): boolean {
   if (filters.institution && institution !== filters.institution) return false;
   const term = filters.search?.trim().toLowerCase();
   return !term || name.toLowerCase().includes(term);
@@ -59,6 +61,23 @@ export async function getRanking(
   kind: RankingKind,
   filters: TableFilters & { top: number },
 ): Promise<RankingQuery> {
+  if (kind === 'conductores') {
+    const result = await consultarTopConductores({
+      top: filters.top,
+      institucionId: filters.institutionId,
+      buscar: filters.search?.trim() || undefined,
+    });
+    return {
+      entries: result.conductores.map((entry) => ({
+        id: String(entry.conductorId),
+        name: entry.conductor,
+        institution: entry.institucion,
+        trips: entry.viajesFinalizados,
+      })),
+      totalWithRecords: result.totalConductores,
+    };
+  }
+
   const query = rankings[kind];
   const entries = query.entries.filter((entry) => matches(entry.name, entry.institution, filters));
   return respond({ ...query, entries: entries.slice(0, Math.max(0, filters.top)) });
