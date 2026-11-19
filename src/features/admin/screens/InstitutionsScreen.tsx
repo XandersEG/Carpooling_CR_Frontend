@@ -15,6 +15,9 @@ import type { Institucion } from '../types';
 import { useData } from '../useData';
 import { useLayout } from '../useLayout';
 
+// texto que se muestra en una institución que todavía no tiene acrónimo
+const SIN_ACRONIMO = 'Sin registrar';
+
 type DialogProps = {
   // institución a editar; sin ella el diálogo agrega una nueva
   institucion?: Institucion;
@@ -25,6 +28,7 @@ type DialogProps = {
 // diálogo para agregar o editar una institución.  
 function InstitutionDialog({ institucion, onClose, onSaved }: DialogProps) {
   const [nombre, setNombre] = useState(institucion?.nombre ?? '');
+  const [acronimo, setAcronimo] = useState(institucion?.acronimo ?? '');
   const [dominio, setDominio] = useState(institucion?.dominioCorreo ?? '');
   const [guardando, setGuardando] = useState(false);
   const [errores, setErrores] = useState<string[]>([]);
@@ -34,7 +38,7 @@ function InstitutionDialog({ institucion, onClose, onSaved }: DialogProps) {
     setGuardando(true);
     setErrores([]);
     try {
-      const datos = { nombre, dominioCorreo: dominio };
+      const datos = { nombre, acronimo, dominioCorreo: dominio };
       if (institucion) {
         await actualizarInstitucion(institucion.id, datos);
         onSaved(`«${nombre.trim()}» se actualizó correctamente`);
@@ -72,6 +76,15 @@ function InstitutionDialog({ institucion, onClose, onSaved }: DialogProps) {
       }
     >
       <Field label="Nombre" value={nombre} onChangeText={setNombre} maxLength={150} autoFocus />
+      <Field
+        label="Acrónimo"
+        value={acronimo}
+        onChangeText={setAcronimo}
+        placeholder="Ej: TEC"
+        autoCapitalize="characters"
+        maxLength={10}
+        style={acronimo ? styles.mayusculas : null}
+      />
       <Field
         label="Dominio de correo"
         value={dominio}
@@ -166,6 +179,7 @@ export function InstitutionsScreen() {
       ) : (
         <View style={[styles.tarjeta, styles.titulos]}>
           <Text style={[styles.titulo, styles.columna]}>Nombre de institución</Text>
+          <Text style={[styles.titulo, styles.columnaCorta, styles.separado]}>Acrónimo</Text>
           <Text style={[styles.titulo, styles.columna, styles.separado]}>Dominio de correo</Text>
           <View style={[styles.acciones, styles.separado]}>{agregar}</View>
         </View>
@@ -198,6 +212,16 @@ export function InstitutionsScreen() {
                 <Text
                   style={[styles.etiqueta, institucion.activo ? null : styles.etiquetaInactiva]}
                 >
+                  Acrónimo
+                </Text>
+                <Text style={[styles.celda, institucion.acronimo ? null : styles.sinDato]}>
+                  {institucion.acronimo || SIN_ACRONIMO}
+                </Text>
+              </View>
+              <View>
+                <Text
+                  style={[styles.etiqueta, institucion.activo ? null : styles.etiquetaInactiva]}
+                >
                   Dominio de correo
                 </Text>
                 <Text style={styles.celda}>{institucion.dominioCorreo}</Text>
@@ -220,6 +244,15 @@ export function InstitutionsScreen() {
               ]}
             >
               <Text style={[styles.celda, styles.columna]}>{institucion.nombre}</Text>
+              <Text
+                style={[
+                  styles.celda,
+                  styles.columnaCorta,
+                  institucion.acronimo ? null : styles.sinDato,
+                ]}
+              >
+                {institucion.acronimo || SIN_ACRONIMO}
+              </Text>
               <Text style={[styles.celda, styles.columna]}>{institucion.dominioCorreo}</Text>
               <View style={styles.acciones}>{acciones(institucion)}</View>
             </View>
@@ -259,6 +292,7 @@ const styles = StyleSheet.create({
   },
   titulo: {
     paddingVertical: 4,
+    paddingHorizontal: 4,
     fontFamily: fuente.negrita,
     fontSize: 15,
     color: color.texto,
@@ -268,9 +302,22 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderLeftColor: color.grisOscuro,
   },
+  // con este mínimo la fila no se parte en dos en los anchos más justos (700 y 900 px)
   columna: {
     flex: 1,
-    minWidth: 140,
+    minWidth: 90,
+  },
+  // columna del acrónimo: angosta y centrada, para que no se pegue al nombre
+  columnaCorta: {
+    width: 92,
+    textAlign: 'center',
+  },
+  sinDato: {
+    color: color.textoSuave,
+  },
+  // el acrónimo se ve en mayúsculas mientras se escribe; el servidor lo guarda así
+  mayusculas: {
+    textTransform: 'uppercase',
   },
   acciones: {
     width: 230,

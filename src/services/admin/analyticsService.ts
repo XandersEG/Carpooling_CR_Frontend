@@ -1,8 +1,8 @@
 /**
  * Consultas generales y Estadísticas del portal administrativo.
  *
- * Provisional: la mayoría de las consultas usa datos de ejemplo. "Usuarios
- * nuevos" ya consulta el back end; las demás conservan los fixtures del diseño.
+ * Provisional: "Puntos concurrentes" y "Usuarios nuevos" consultan el back end;
+ * las demás conservan los fixtures del diseño.
  */
 import type {
   AgeRangeStat,
@@ -18,11 +18,14 @@ import type {
 } from '@/src/types/analytics';
 import type { IsoDate } from '@/src/types/common';
 import { toIsoDate } from '@/src/utils/format';
+import {
+  consultarPuntosConcurrentes,
+  consultarTopConductores,
+  consultarUsuariosNuevos,
+} from '@/src/features/admin/api';
 
 import * as fixtures from '../mock/fixtures/analytics';
 import { respond } from '../mock/utils';
-import { consultarUsuariosNuevos } from '@/src/features/admin/api';
-import { consultarTopConductores } from '@/src/features/admin/api';
 
 import { obtenerEstadisticas } from '@/src/features/admin/api';
 import { USE_MOCK_DATA } from '../config';
@@ -40,9 +43,8 @@ export type DateRange = {
   to?: IsoDate | null;
 };
 
-const rankings: Record<RankingKind, RankingQuery> = {
+const rankings: Record<Exclude<RankingKind, 'puntos'>, RankingQuery> = {
   conductores: fixtures.topDrivers,
-  puntos: fixtures.busiestPoints,
   usuarios: fixtures.mostActiveUsers,
 };
 
@@ -59,8 +61,21 @@ export async function listInstitutionFilterOptions(): Promise<InstitutionFilterO
 /** "Top N" de conductores, puntos de recogida o usuarios. */
 export async function getRanking(
   kind: RankingKind,
-  filters: TableFilters & { top: number },
+  filters: TableFilters &
+    DateRange & {
+      top: number;
+      institutionId?: number;
+    },
 ): Promise<RankingQuery> {
+  if (kind === 'puntos') {
+    return consultarPuntosConcurrentes({
+      desde: filters.from ?? undefined,
+      hasta: filters.to ?? undefined,
+      institucionId: filters.institutionId,
+      top: filters.top,
+    });
+  }
+
   if (kind === 'conductores') {
     const result = await consultarTopConductores({
       top: filters.top,

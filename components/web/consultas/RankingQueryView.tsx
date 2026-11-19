@@ -11,8 +11,9 @@ import {
 } from '@/components/web/analytics';
 import { ALL_INSTITUTIONS, InstitutionFilter, institutionCode, useInstitutionOptions } from '@/components/web/consultas/shared';
 import { DateField, FilterCard, FilterItem, FilterSearch, TopStepper } from '@/components/web/filters';
+import { listarInstituciones, mensajesDe } from '@/src/features/admin/api';
+import type { Institucion } from '@/src/features/admin/types';
 import { getRanking, type RankingKind } from '@/src/services/admin/analyticsService';
-import { mensajesDe } from '@/src/features/admin/api';
 import type { RankingQuery } from '@/src/types/analytics';
 import type { IsoDate } from '@/src/types/common';
 import { palette } from '@/src/constants/theme';
@@ -33,6 +34,13 @@ const DEFAULT_TOP = 5;
 /** Límite del selector "Top N" (no definido en el diseño). */
 const MAX_TOP = 20;
 
+function fechaActual(): IsoDate {
+  const hoy = new Date();
+  const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+  const dia = String(hoy.getDate()).padStart(2, '0');
+  return `${hoy.getFullYear()}-${mes}-${dia}`;
+}
+
 export const rankingConfigs: Record<RankingKind, RankingConfig> = {
   conductores: {
     filter: 'search',
@@ -51,7 +59,6 @@ export const rankingConfigs: Record<RankingKind, RankingConfig> = {
     totalLabel: 'Puntos con registros',
     nameHeader: 'PUNTO',
     defaultFrom: '2026-01-01',
-    defaultTo: '2026-10-15',
   },
   usuarios: {
     filter: 'search',
@@ -67,46 +74,78 @@ export const rankingConfigs: Record<RankingKind, RankingConfig> = {
 /** Consultas 1–3 (228:142, 340:3557, 340:3858): tabla "Top N" con barra en la celda. */
 export function RankingQueryView({ kind }: { kind: RankingKind }) {
   const config = rankingConfigs[kind];
+  const [institutions, setInstitutions] = useState<Institucion[]>([]);
+  const [institutionError, setInstitutionError] = useState<string | null>(null);
   const [institution, setInstitution] = useState(ALL_INSTITUTIONS);
   const [search, setSearch] = useState('');
-  // Las fechas no filtran: los datos de ejemplo no tienen fechas por fila.
+  // El rango se consulta para puntos concurrentes; los demás rankings usan fixtures.
   const [from, setFrom] = useState<IsoDate | null>(config.defaultFrom ?? null);
-  const [to, setTo] = useState<IsoDate | null>(config.defaultTo ?? null);
+  const [to, setTo] = useState<IsoDate | null>(
+    kind === 'puntos' ? fechaActual() : config.defaultTo ?? null,
+  );
   const [top, setTop] = useState(DEFAULT_TOP);
   const [query, setQuery] = useState<RankingQuery | null>(null);
-  const [queryError, setQueryError] = useState<string | null>(null);
-  const [institutionError, setInstitutionError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const options = useInstitutionOptions(
     kind === 'conductores' ? 'admin' : 'mock',
     setInstitutionError,
   );
-
   const selectedInstitution = options.find((option) => option.label === institution);
-  const code = institutionCode(options, institution);
 
   useEffect(() => {
+    if (kind !== 'puntos') return;
+
     let mounted = true;
-    setQuery(null);
-    setQueryError(null);
-    getRanking(kind, {
-      institution: code,
-      institutionId: selectedInstitution?.id,
-      search,
-      top,
-    }).then(
-      (result) => mounted && setQuery(result),
-      (reason: unknown) => mounted && setQueryError(mensajesDe(reason).join(' ')),
-    );
+    listarInstituciones()
+      .then((result) => mounted && setInstitutions(result.filter((item) => item.activo)))
+      .catch((cause: unknown) => mounted && setInstitutionError(mensajesDe(cause).join(' ')));
     return () => {
       mounted = false;
     };
-  }, [kind, code, selectedInstitution?.id, search, top]);
+  }, [kind]);
+
+  const filterOptions =
+    kind === 'puntos'
+      ? [
+          { label: ALL_INSTITUTIONS, code: null },
+          ...institutions.map((item) => ({ label: item.nombre, code: null })),
+        ]
+      : options;
+  const institutionId =
+    kind === 'puntos'
+      ? institutions.find((item) => item.nombre === institution)?.id
+      : selectedInstitution?.id;
+  const code = kind === 'puntos' ? null : institutionCode(options, institution);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setError(null);
+    setQuery(null);
+    getRanking(kind, {
+      institution: code,
+      institutionId,
+      search,
+      top,
+      from,
+      to,
+    })
+      .then((result) => mounted && setQuery(result))
+      .catch((cause: unknown) => {
+        if (mounted) setError(mensajesDe(cause).join(' '));
+      })
+      .finally(() => mounted && setLoading(false));
+    return () => {
+      mounted = false;
+    };
+  }, [kind, code, institutionId, search, top, from, to]);
 
   const reset = () => {
     setInstitution(ALL_INSTITUTIONS);
     setSearch('');
     setFrom(config.defaultFrom ?? null);
-    setTo(config.defaultTo ?? null);
+    setTo(kind === 'puntos' ? fechaActual() : config.defaultTo ?? null);
     setTop(DEFAULT_TOP);
   };
 
@@ -115,7 +154,7 @@ export function RankingQueryView({ kind }: { kind: RankingKind }) {
   return (
     <>
       <FilterCard onReset={reset}>
-        <InstitutionFilter value={institution} onChange={setInstitution} options={options} />
+        <InstitutionFilter value={institution} onChange={setInstitution} options={filterOptions} />
         {config.filter === 'search' ? (
           <FilterItem label="Buscar">
             <FilterSearch value={search} onChange={setSearch} />
@@ -134,6 +173,7 @@ export function RankingQueryView({ kind }: { kind: RankingKind }) {
           <TopStepper value={top} onChange={setTop} max={MAX_TOP} accessibilityLabel="Top" />
         </FilterItem>
       </FilterCard>
+      {institutionError ? <Text style={styles.error}>{institutionError}</Text> : null}
 
       <ResultsCard
         title={config.title(top)}
@@ -150,13 +190,14 @@ export function RankingQueryView({ kind }: { kind: RankingKind }) {
           </Text>
           <Text style={[analyticsStyles.headerText, styles.trips, styles.tripsHeader]}>VIAJES</Text>
         </TableHeaderRow>
-        {institutionError || queryError ? (
-          <Text style={styles.error}>{institutionError ?? queryError}</Text>
-        ) : null}
-        {query === null && !queryError ? (
+        {loading ? (
           <ActivityIndicator color={palette.lime} style={styles.loading} />
-        ) : (
-          query?.entries.map((entry, index) => (
+        ) : error ? (
+          <Text style={styles.error}>{error}</Text>
+        ) : query === null ? null : (
+          query.entries.length === 0 ? (
+            <Text style={styles.empty}>No se encontraron resultados para esos filtros.</Text>
+          ) : query.entries.map((entry, index) => (
             <View key={entry.id} style={analyticsStyles.row}>
               <View style={styles.position}>
                 <RankBadge position={index + 1} />
@@ -164,9 +205,13 @@ export function RankingQueryView({ kind }: { kind: RankingKind }) {
               <Text style={[analyticsStyles.cellText, styles.name]} numberOfLines={1}>
                 {entry.name}
               </Text>
-              <View style={styles.institution}>
-                <InstitutionPill name={entry.institution} />
-              </View>
+              {kind === 'puntos' ? (
+                <Text style={[analyticsStyles.cellText, styles.institution]}>{entry.institution}</Text>
+              ) : (
+                <View style={styles.institution}>
+                  <InstitutionPill name={entry.institution} />
+                </View>
+              )}
               <View style={styles.trips}>
                 <BarCell value={entry.trips} max={maxTrips} />
               </View>
@@ -213,5 +258,14 @@ const styles = StyleSheet.create({
     marginTop: 24,
     color: palette.terracotta,
     fontSize: 14,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  empty: {
+    color: palette.grey,
+    fontSize: 14,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    textAlign: 'center',
   },
 });
