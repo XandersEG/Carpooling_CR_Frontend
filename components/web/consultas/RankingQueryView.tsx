@@ -12,6 +12,7 @@ import {
 import { ALL_INSTITUTIONS, InstitutionFilter, institutionCode, useInstitutionOptions } from '@/components/web/consultas/shared';
 import { DateField, FilterCard, FilterItem, FilterSearch, TopStepper } from '@/components/web/filters';
 import { getRanking, type RankingKind } from '@/src/services/admin/analyticsService';
+import { mensajesDe } from '@/src/features/admin/api';
 import type { RankingQuery } from '@/src/types/analytics';
 import type { IsoDate } from '@/src/types/common';
 import { palette } from '@/src/constants/theme';
@@ -36,8 +37,8 @@ export const rankingConfigs: Record<RankingKind, RankingConfig> = {
   conductores: {
     filter: 'search',
     stepperSuffix: 'conductores',
-    title: (top) => `Top ${top} conductores`,
-    subtitle: () => 'Conductores que han brindado más servicios de transporte.',
+    title: () => 'Ranking',
+    subtitle: () => 'Conductores con más viajes finalizados.',
     totalLabel: 'Conductores con viajes',
     nameHeader: 'CONDUCTOR',
   },
@@ -66,7 +67,6 @@ export const rankingConfigs: Record<RankingKind, RankingConfig> = {
 /** Consultas 1–3 (228:142, 340:3557, 340:3858): tabla "Top N" con barra en la celda. */
 export function RankingQueryView({ kind }: { kind: RankingKind }) {
   const config = rankingConfigs[kind];
-  const options = useInstitutionOptions();
   const [institution, setInstitution] = useState(ALL_INSTITUTIONS);
   const [search, setSearch] = useState('');
   // Las fechas no filtran: los datos de ejemplo no tienen fechas por fila.
@@ -74,16 +74,33 @@ export function RankingQueryView({ kind }: { kind: RankingKind }) {
   const [to, setTo] = useState<IsoDate | null>(config.defaultTo ?? null);
   const [top, setTop] = useState(DEFAULT_TOP);
   const [query, setQuery] = useState<RankingQuery | null>(null);
+  const [queryError, setQueryError] = useState<string | null>(null);
+  const [institutionError, setInstitutionError] = useState<string | null>(null);
+  const options = useInstitutionOptions(
+    kind === 'conductores' ? 'admin' : 'mock',
+    setInstitutionError,
+  );
 
+  const selectedInstitution = options.find((option) => option.label === institution);
   const code = institutionCode(options, institution);
 
   useEffect(() => {
     let mounted = true;
-    getRanking(kind, { institution: code, search, top }).then((result) => mounted && setQuery(result));
+    setQuery(null);
+    setQueryError(null);
+    getRanking(kind, {
+      institution: code,
+      institutionId: selectedInstitution?.id,
+      search,
+      top,
+    }).then(
+      (result) => mounted && setQuery(result),
+      (reason: unknown) => mounted && setQueryError(mensajesDe(reason).join(' ')),
+    );
     return () => {
       mounted = false;
     };
-  }, [kind, code, search, top]);
+  }, [kind, code, selectedInstitution?.id, search, top]);
 
   const reset = () => {
     setInstitution(ALL_INSTITUTIONS);
@@ -129,12 +146,15 @@ export function RankingQueryView({ kind }: { kind: RankingKind }) {
           <Text style={[analyticsStyles.headerText, styles.positionHeader]}>POSICIÓN</Text>
           <Text style={[analyticsStyles.headerText, styles.name]}>{config.nameHeader}</Text>
           <Text style={[analyticsStyles.headerText, styles.institution]}>INSTITUCIÓN</Text>
-          <Text style={[analyticsStyles.headerText, styles.trips, styles.tripsHeader]}>VIAJES BRINDADOS</Text>
+          <Text style={[analyticsStyles.headerText, styles.trips, styles.tripsHeader]}>VIAJES</Text>
         </TableHeaderRow>
-        {query === null ? (
+        {institutionError || queryError ? (
+          <Text style={styles.error}>{institutionError ?? queryError}</Text>
+        ) : null}
+        {query === null && !queryError ? (
           <ActivityIndicator color={palette.lime} style={styles.loading} />
         ) : (
-          query.entries.map((entry, index) => (
+          query?.entries.map((entry, index) => (
             <View key={entry.id} style={analyticsStyles.row}>
               <View style={styles.position}>
                 <RankBadge position={index + 1} />
@@ -143,7 +163,7 @@ export function RankingQueryView({ kind }: { kind: RankingKind }) {
                 {entry.name}
               </Text>
               <View style={styles.institution}>
-                <InstitutionPill code={entry.institution} />
+                <InstitutionPill name={entry.institution} />
               </View>
               <View style={styles.trips}>
                 <BarCell value={entry.trips} max={maxTrips} />
@@ -181,5 +201,10 @@ const styles = StyleSheet.create({
   },
   loading: {
     marginTop: 40,
+  },
+  error: {
+    marginTop: 24,
+    color: palette.terracotta,
+    fontSize: 14,
   },
 });
