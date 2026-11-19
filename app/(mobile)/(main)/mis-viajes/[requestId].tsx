@@ -13,11 +13,12 @@ import { formatLongDate } from '@/src/utils/format';
 
 /**
  * "Resumen del viaje": Aprobado (Figma 2501:5937), Pendiente (2501:6580) y
- * Cancelado (2501:6684). El aviso de pago solo aparece en la solicitud aprobada.
+ * Cancelado (2501:6684). El aviso de pago solo aparece en la solicitud aprobada
+ * de un viaje que todavía no termina.
  */
 export default function ResumenViajeScreen() {
   const { requestId } = useLocalSearchParams<{ requestId: string }>();
-  const request = useServiceData(() => getMyTrip(requestId), [requestId]);
+  const request = useServiceData(() => getMyTrip(requestId), [requestId], { reloadOnFocus: true });
   const item = request.data;
 
   return (
@@ -38,8 +39,8 @@ export default function ResumenViajeScreen() {
               />
             }
           />
-          {item.status === 'aprobada' ? (
-            <NoticeBox text="El pago se realiza directamente con el conductor. Coordina el encuentro por medios externos a la app." />
+          {item.status === 'aprobada' && item.trip.status !== 'finalizado' ? (
+            <NoticeBox text="El pago se realiza directamente con el conductor, coordina el encuentro por medios externos a la app" />
           ) : null}
         </>
       ) : (

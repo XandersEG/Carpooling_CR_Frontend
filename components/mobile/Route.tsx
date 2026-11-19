@@ -79,6 +79,7 @@ const styles = StyleSheet.create({
   },
   stopText: {
     ...typography.textStrong,
+    flexShrink: 1,
     color: colors.textPrimary,
   },
   lineWrapper: {
