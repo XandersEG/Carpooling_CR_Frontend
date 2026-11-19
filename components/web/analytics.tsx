@@ -145,11 +145,11 @@ export function RankBadge({ position }: { position: number }) {
   );
 }
 
-/** Pastilla gris con las siglas de la institución. */
-export function InstitutionPill({ code }: { code: string }) {
+/** Pastilla gris con el nombre de la institución. */
+export function InstitutionPill({ name }: { name: string }) {
   return (
     <View style={styles.institution}>
-      <Text style={styles.institutionText}>{code}</Text>
+      <Text style={styles.institutionText}>{name}</Text>
     </View>
   );
 }
