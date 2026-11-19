@@ -5,7 +5,7 @@
  * Searching trips and the trip detail use the Backend (`/passenger/trips`) when
  * `EXPO_PUBLIC_USE_MOCKS=false`. Provisional: lo demás sigue simulado.
  */
-import type { Id, Place } from '@/src/types/common';
+import type { GeoPoint, Id, Place } from '@/src/types/common';
 import type { PassengerTrip, Trip, TripHistoryItem, TripSearchParams, TripStatus } from '@/src/types/trip';
 
 import { apiRequest } from './apiClient';
@@ -153,8 +153,34 @@ export async function getPickupPoints(_tripId: Id): Promise<Place[]> {
   return respond(db.pickupPoints);
 }
 
+/** Pickup point chosen by the passenger: a name for the driver and its map point. */
+export type PickupChoice = Place & { point: GeoPoint };
+
+/** Response of `POST /passenger/trips/:id/join-requests`. */
+type JoinRequestResponse = {
+  id: number;
+  viajeId: number;
+  estado: 'PENDIENTE';
+};
+
 /** "Solicitar unirme" + "Confirmar punto de recolección". */
-export async function requestToJoin(tripId: Id, pickupPoint: Place): Promise<PassengerTrip> {
+export async function requestToJoin(tripId: Id, pickupPoint: PickupChoice): Promise<PassengerTrip> {
+  if (!USE_MOCK_DATA) {
+    const request = await apiRequest<JoinRequestResponse>(
+      `/passenger/trips/${encodeURIComponent(tripId)}/join-requests`,
+      {
+        method: 'POST',
+        body: { nombre: pickupPoint.name, lat: pickupPoint.point.lat, lng: pickupPoint.point.lng },
+      },
+    );
+    return {
+      requestId: String(request.id),
+      status: 'pendiente',
+      pickupPoint: { name: pickupPoint.name, detail: pickupPoint.detail },
+      trip: await getTrip(tripId),
+    };
+  }
+
   const trip = db.availableTrips.find((item) => item.id === tripId);
   if (!trip) throw notFound('Viaje', tripId);
 

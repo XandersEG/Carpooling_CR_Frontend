@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
-import NativeMapView, { Marker, Polyline } from 'react-native-maps';
+import NativeMapView, { Marker, Polyline, type MapPressEvent } from 'react-native-maps';
 
 import { colors, palette } from '@/src/constants/theme';
 import type { GeoPoint } from '@/src/types/common';
@@ -15,6 +15,11 @@ export type RouteMapProps = {
   destinationLabel?: string;
   /** false = decorative background: no panning, zooming or tapping. */
   interactive?: boolean;
+  /** Passenger's pickup point (orange pin). */
+  pickup?: GeoPoint | null;
+  pickupLabel?: string;
+  /** When given, tapping the map or dragging the pickup pin sets the pickup point. */
+  onPickPoint?: (point: GeoPoint) => void;
   insets?: MapInsets;
   style?: StyleProp<ViewStyle>;
 };
@@ -26,6 +31,11 @@ const CENTRAL_VALLEY = {
   latitudeDelta: 0.35,
   longitudeDelta: 0.35,
 };
+
+/** The Backend stores coordinates with 6 decimals. */
+function toGeoPoint(coordinate: { latitude: number; longitude: number }): GeoPoint {
+  return { lat: Number(coordinate.latitude.toFixed(6)), lng: Number(coordinate.longitude.toFixed(6)) };
+}
 
 function toLatLng(point: GeoPoint) {
   return { latitude: point.lat, longitude: point.lng };
@@ -42,6 +52,9 @@ export function RouteMap({
   originLabel,
   destinationLabel,
   interactive = true,
+  pickup,
+  pickupLabel,
+  onPickPoint,
   insets,
   style,
 }: RouteMapProps) {
@@ -75,12 +88,22 @@ export function RouteMap({
       pitchEnabled={interactive}
       toolbarEnabled={false}
       pointerEvents={interactive ? 'auto' : 'none'}
+      onPress={onPickPoint ? (event: MapPressEvent) => onPickPoint(toGeoPoint(event.nativeEvent.coordinate)) : undefined}
     >
       {origin ? (
         <Marker coordinate={toLatLng(origin)} title={originLabel || 'Origen'} pinColor={colors.accentGreen} />
       ) : null}
       {destination ? (
         <Marker coordinate={toLatLng(destination)} title={destinationLabel || 'Destino'} pinColor={palette.black} />
+      ) : null}
+      {pickup ? (
+        <Marker
+          coordinate={toLatLng(pickup)}
+          title={pickupLabel || 'Punto de recolección'}
+          pinColor={palette.terracotta}
+          draggable={Boolean(onPickPoint)}
+          onDragEnd={(event) => onPickPoint?.(toGeoPoint(event.nativeEvent.coordinate))}
+        />
       ) : null}
       {origin && destination ? (
         <Polyline
