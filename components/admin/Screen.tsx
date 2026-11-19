@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { iniciales, leerSesion } from '@/src/features/admin/session';
+import { iniciales, useNombreDeSesion } from '@/src/features/admin/session';
 import { color, fuente } from '@/src/features/admin/theme';
 import { useLayout } from '@/src/features/admin/useLayout';
 
@@ -30,7 +30,7 @@ export function Screen({
   sinRelleno = false,
   children,
 }: Props) {
-  const sesion = leerSesion();
+  const nombre = useNombreDeSesion();
   const { angosta, celular } = useLayout();
 
   return (
@@ -56,19 +56,19 @@ export function Screen({
         <View style={styles.campana}>
           <Ionicons name="notifications-outline" size={18} color={color.terracota} />
         </View>
-        {sesion ? (
+        {nombre ? (
           angosta ? (
             // el nombre y el rol se ven en el menú; aquí solo cabe el avatar
-            <View style={styles.avatar} accessibilityLabel={sesion.nombre}>
-              <Text style={styles.iniciales}>{iniciales(sesion.nombre)}</Text>
+            <View style={styles.avatar} accessibilityLabel={nombre}>
+              <Text style={styles.iniciales}>{iniciales(nombre)}</Text>
             </View>
           ) : (
             <View style={styles.usuario}>
               <View style={styles.avatar}>
-                <Text style={styles.iniciales}>{iniciales(sesion.nombre)}</Text>
+                <Text style={styles.iniciales}>{iniciales(nombre)}</Text>
               </View>
               <View>
-                <Text style={styles.nombre}>{sesion.nombre}</Text>
+                <Text style={styles.nombre}>{nombre}</Text>
                 <Text style={styles.rol}>Administrador</Text>
               </View>
             </View>

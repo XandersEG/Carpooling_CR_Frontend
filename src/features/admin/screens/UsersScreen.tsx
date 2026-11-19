@@ -21,6 +21,7 @@ import {
   listarUsuarios,
   mensajesDe,
 } from '../api';
+import { cambiarNombreDeSesion, cerrarSesion, leerSesion } from '../session';
 import { color, fuente } from '../theme';
 import type { Administrador } from '../types';
 import { useData } from '../useData';
@@ -38,6 +39,7 @@ type AdministratorDialogProps = {
 
 // diálogo para registrar o editar un administrador: pide los datos de la tabla de administradores.  
 function AdministratorDialog({ administrador, onClose, onSaved }: AdministratorDialogProps) {
+  const router = useRouter();
   const [nombre, setNombre] = useState(administrador?.nombre ?? '');
   const [correo, setCorreo] = useState(administrador?.correo ?? '');
   const [password, setPassword] = useState('');
@@ -62,6 +64,14 @@ function AdministratorDialog({ administrador, onClose, onSaved }: AdministratorD
           correo,
           ...(password === '' ? {} : { password }),
         });
+        if (password !== '') {
+          // la contraseña nueva cerró todas las sesiones de la cuenta, también la de este navegador
+          cerrarSesion();
+          router.replace('/admin/login?restablecida=1');
+          return;
+        }
+        // es la cuenta propia: el encabezado y el menú muestran el nombre nuevo al instante
+        cambiarNombreDeSesion(nombre.trim());
         onSaved(`«${nombre.trim()}» se actualizó correctamente`);
       } else {
         await crearAdministrador({ nombre, correo, password });
@@ -113,7 +123,7 @@ function AdministratorDialog({ administrador, onClose, onSaved }: AdministratorD
         value={password}
         onChangeText={setPassword}
         placeholder={administrador ? 'Déjala vacía para no cambiarla' : 'Mínimo 8 caracteres'}
-        secureTextEntry
+        contrasena
         autoCapitalize="none"
         autoComplete="new-password"
         maxLength={128}
@@ -122,11 +132,70 @@ function AdministratorDialog({ administrador, onClose, onSaved }: AdministratorD
         label={administrador ? 'Confirmar nueva contraseña' : 'Confirmar contraseña'}
         value={confirmacion}
         onChangeText={setConfirmacion}
-        secureTextEntry
+        contrasena
         autoCapitalize="none"
         autoComplete="new-password"
         maxLength={128}
       />
+    </Dialog>
+  );
+}
+
+type DeactivateDialogProps = {
+  administrador: Administrador;
+  onClose: () => void;
+};
+
+// confirmación antes de desactivar la cuenta propia: después se cierra la sesión
+function DeactivateOwnAccountDialog({ administrador, onClose }: DeactivateDialogProps) {
+  const router = useRouter();
+  const [desactivando, setDesactivando] = useState(false);
+  const [errores, setErrores] = useState<string[]>([]);
+
+  async function desactivar() {
+    if (desactivando) return;
+    setDesactivando(true);
+    setErrores([]);
+    try {
+      await actualizarAdministrador(administrador.id, { activo: false });
+      // el servidor ya cerró las sesiones de la cuenta; aquí se borra la de este navegador
+      cerrarSesion();
+      router.replace('/admin/login?desactivada=1');
+    } catch (error) {
+      setErrores(mensajesDe(error));
+      setDesactivando(false);
+    }
+  }
+
+  return (
+    <Dialog
+      title="Desactivar tu cuenta"
+      icon="person-remove-outline"
+      onClose={onClose}
+      errores={errores}
+      footer={
+        <>
+          <PillButton
+            label="Cancelar"
+            tono="gris"
+            expandido
+            onPress={onClose}
+            disabled={desactivando}
+          />
+          <PillButton
+            label="Desactivar"
+            tono="terracota"
+            expandido
+            onPress={() => void desactivar()}
+            ocupado={desactivando}
+          />
+        </>
+      }
+    >
+      <Text style={styles.pregunta}>¿Seguro que deseas desactivar tu cuenta?</Text>
+      <Text style={styles.ayuda}>
+        Se cerrará tu sesión y no podrás volver a entrar con esta cuenta.
+      </Text>
     </Dialog>
   );
 }
@@ -141,27 +210,11 @@ function AdministratorsArea({ onSaved }: AdministratorsAreaProps) {
   const { angosta, celular } = useLayout();
   const { datos, cargando, errores, recargar } = useData(listarAdministradores, []);
   const [dialogo, setDialogo] = useState<{ administrador?: Administrador } | null>(null);
-  // id del administrador que se está activando o desactivando
-  const [cambiando, setCambiando] = useState<number | null>(null);
-  const [erroresDeAccion, setErroresDeAccion] = useState<string[]>([]);
+  // cuenta propia que se quiere desactivar: antes se pide confirmación
+  const [desactivandoPropia, setDesactivandoPropia] = useState<Administrador | null>(null);
   const administradores = datos ?? [];
-
-  async function cambiarEstado(administrador: Administrador) {
-    if (cambiando !== null) return;
-    setCambiando(administrador.id);
-    setErroresDeAccion([]);
-    try {
-      await actualizarAdministrador(administrador.id, { activo: !administrador.activo });
-      onSaved(
-        `«${administrador.nombre}» se ${administrador.activo ? 'desactivó' : 'activó'} correctamente`,
-      );
-      recargar();
-    } catch (error) {
-      setErroresDeAccion(mensajesDe(error));
-    } finally {
-      setCambiando(null);
-    }
-  }
+  // cada administrador solo puede editar y desactivar su propia cuenta
+  const miId = leerSesion()?.id;
 
   // texto que ocupa el lugar de la lista mientras carga o si está vacía
   const aviso =
@@ -188,7 +241,6 @@ function AdministratorsArea({ onSaved }: AdministratorsAreaProps) {
       </View>
 
       <Notice mensajes={errores} onRetry={recargar} />
-      <Notice mensajes={erroresDeAccion} />
 
       {celular ? (
         <>
@@ -204,21 +256,22 @@ function AdministratorsArea({ onSaved }: AdministratorsAreaProps) {
                 <StatusPill activo={administrador.activo} lleno />
               </View>
               <Text style={styles.correoFicha}>{administrador.correo}</Text>
-              <View style={styles.botones}>
-                <PillButton
-                  label="Editar"
-                  tono="malva"
-                  expandido
-                  onPress={() => setDialogo({ administrador })}
-                />
-                <PillButton
-                  label={administrador.activo ? 'Desactivar' : 'Activar'}
-                  tono={administrador.activo ? 'terracota' : 'verde'}
-                  expandido
-                  onPress={() => void cambiarEstado(administrador)}
-                  ocupado={cambiando === administrador.id}
-                />
-              </View>
+              {administrador.id === miId ? (
+                <View style={styles.botones}>
+                  <PillButton
+                    label="Editar"
+                    tono="malva"
+                    expandido
+                    onPress={() => setDialogo({ administrador })}
+                  />
+                  <PillButton
+                    label="Desactivar"
+                    tono="terracota"
+                    expandido
+                    onPress={() => setDesactivandoPropia(administrador)}
+                  />
+                </View>
+              ) : null}
             </View>
           ))}
         </>
@@ -253,19 +306,22 @@ function AdministratorsArea({ onSaved }: AdministratorsAreaProps) {
                 <StatusPill activo={administrador.activo} lleno />
               </View>
               <View style={styles.colAcciones}>
-                <PillButton
-                  label="Editar"
-                  tono="malva"
-                  pequeno
-                  onPress={() => setDialogo({ administrador })}
-                />
-                <PillButton
-                  label={administrador.activo ? 'Desactivar' : 'Activar'}
-                  tono={administrador.activo ? 'terracota' : 'verde'}
-                  pequeno
-                  onPress={() => void cambiarEstado(administrador)}
-                  ocupado={cambiando === administrador.id}
-                />
+                {administrador.id === miId ? (
+                  <>
+                    <PillButton
+                      label="Editar"
+                      tono="malva"
+                      pequeno
+                      onPress={() => setDialogo({ administrador })}
+                    />
+                    <PillButton
+                      label="Desactivar"
+                      tono="terracota"
+                      pequeno
+                      onPress={() => setDesactivandoPropia(administrador)}
+                    />
+                  </>
+                ) : null}
               </View>
             </View>
           ))}
@@ -287,6 +343,13 @@ function AdministratorsArea({ onSaved }: AdministratorsAreaProps) {
             onSaved(mensaje);
             recargar();
           }}
+        />
+      ) : null}
+
+      {desactivandoPropia ? (
+        <DeactivateOwnAccountDialog
+          administrador={desactivandoPropia}
+          onClose={() => setDesactivandoPropia(null)}
         />
       ) : null}
     </View>
@@ -667,5 +730,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginTop: 6,
+  },
+  pregunta: {
+    fontFamily: fuente.negrita,
+    fontSize: 14,
+    lineHeight: 22,
+    color: color.texto,
+  },
+  ayuda: {
+    fontFamily: fuente.normal,
+    fontSize: 12,
+    lineHeight: 18,
+    color: color.textoSuave,
   },
 });
