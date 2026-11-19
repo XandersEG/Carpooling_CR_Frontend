@@ -3,6 +3,9 @@ import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import NativeMapView, { Marker, Polyline, type MapPressEvent } from 'react-native-maps';
 
 import { colors, palette } from '@/src/constants/theme';
+
+import { MapView } from './MapView';
+import { useAfterTransition } from './useAfterTransition';
 import type { GeoPoint } from '@/src/types/common';
 
 /** Space covered by content on top of the map, kept clear when fitting the points. */
@@ -59,6 +62,7 @@ export function RouteMap({
   style,
 }: RouteMapProps) {
   const mapRef = useRef<NativeMapView>(null);
+  const ready = useAfterTransition();
   const top = insets?.top ?? 0;
   const bottom = insets?.bottom ?? 0;
 
@@ -75,7 +79,10 @@ export function RouteMap({
     } else if (points.length === 1) {
       map.animateToRegion({ ...toLatLng(points[0]), latitudeDelta: 0.05, longitudeDelta: 0.05 });
     }
-  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, top, bottom]);
+  }, [ready, origin?.lat, origin?.lng, destination?.lat, destination?.lng, top, bottom]);
+
+  // the static map image stands in while the screen slides in
+  if (!ready) return <MapView style={[styles.map, style]} />;
 
   return (
     <NativeMapView

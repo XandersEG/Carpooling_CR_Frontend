@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import MapView, { Marker, Polyline, type MapPressEvent } from 'react-native-maps';
 
+import { MapView as StaticMap } from '@/components/mobile/MapView';
+import { useAfterTransition } from '@/components/mobile/useAfterTransition';
 import { colors, palette } from '@/src/constants/theme';
 import type { GeoPoint } from '@/src/types/common';
 
@@ -58,6 +60,7 @@ export function LocationPickerMap({
   style,
 }: LocationPickerMapProps) {
   const mapRef = useRef<MapView>(null);
+  const ready = useAfterTransition();
 
   // keep the picked points in view (e.g. after choosing a suggestion far from the current view)
   useEffect(() => {
@@ -72,11 +75,14 @@ export function LocationPickerMap({
       const point = (origin ?? destination) as GeoPoint;
       map.animateToRegion({ ...toLatLng(point), latitudeDelta: 0.05, longitudeDelta: 0.05 });
     }
-  }, [origin, destination, topInset]);
+  }, [ready, origin, destination, topInset]);
 
   const handlePress = (event: MapPressEvent) => {
     onPick(target, toGeoPoint(event.nativeEvent.coordinate));
   };
+
+  // the static map image stands in while the screen slides in
+  if (!ready) return <StaticMap style={[styles.map, style]} />;
 
   return (
     <MapView ref={mapRef} style={[styles.map, style]} initialRegion={INITIAL_REGION} onPress={handlePress}>
