@@ -333,6 +333,26 @@ export const consultarTopConductores = (filtros: {
     consulta: filtros,
   });
 
+/* -------------------------- usuarios activos -------------------------- */
+export type RespuestaUsuariosActivos = {
+  usuarios: {
+    usuarioId: number;
+    usuario: string;
+    institucion: string;
+    viajesFinalizados: number;
+  }[];
+  totalUsuarios: number;
+};
+
+export const consultarUsuariosActivos = (filtros: {
+  top: number;
+  institucionId?: number;
+  buscar?: string;
+}) =>
+  pedir<RespuestaUsuariosActivos>('/admin/consultas/usuarios-activos', {
+    consulta: filtros,
+  });
+
 /* ------------------------ consulta monto promedio ------------------------ */
 
 // Contrato de GET /api/admin/consultas/monto-promedio del backend.
