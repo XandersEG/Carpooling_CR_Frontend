@@ -10,7 +10,7 @@ import type {
   UsuarioResumen,
   ValorCatalogo,
 } from './types';
-import type { NewUserEntry, NewUsersQuery } from '@/src/types/analytics';
+import type { NewUserEntry, NewUsersQuery, RankingQuery } from '@/src/types/analytics';
 
 // llamadas al api del portal administrativo
 
@@ -193,6 +193,39 @@ export const listarUsuarios = (filtros: {
   pedir<{ datos: UsuarioResumen[]; total: number }>('/admin/users', {
     consulta: filtros,
   });
+
+type RespuestaPuntosConcurrentes = {
+  puntos: Array<{
+    nombre: string;
+    institucionId: number;
+    institucion: string;
+    viajes: number;
+  }>;
+  totalPuntosConRegistros: number;
+  viajesEnPeriodo: number;
+};
+
+export async function consultarPuntosConcurrentes(filtros: {
+  desde?: string;
+  hasta?: string;
+  institucionId?: number;
+  top: number;
+}): Promise<RankingQuery> {
+  const respuesta = await pedir<RespuestaPuntosConcurrentes>(
+    '/admin/consultas/puntos-concurrentes',
+    { consulta: filtros },
+  );
+  return {
+    entries: respuesta.puntos.map((punto) => ({
+      id: punto.nombre,
+      name: punto.nombre,
+      institution: punto.institucion,
+      trips: punto.viajes,
+    })),
+    totalWithRecords: respuesta.totalPuntosConRegistros,
+    tripsInPeriod: respuesta.viajesEnPeriodo,
+  };
+}
 
 type RespuestaUsuariosNuevos = Omit<NewUsersQuery, 'users'> & {
   users: Array<Omit<NewUserEntry, 'id'> & { id: number }>;

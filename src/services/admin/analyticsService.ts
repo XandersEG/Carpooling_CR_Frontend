@@ -1,8 +1,8 @@
 /**
  * Consultas generales y Estadísticas del portal administrativo.
  *
- * Provisional: la mayoría de las consultas usa datos de ejemplo. "Usuarios
- * nuevos" ya consulta el back end; las demás conservan los fixtures del diseño.
+ * Provisional: "Puntos concurrentes" y "Usuarios nuevos" consultan el back end;
+ * las demás conservan los fixtures del diseño.
  */
 import type {
   AverageAmountQuery,
@@ -15,10 +15,13 @@ import type {
 } from '@/src/types/analytics';
 import type { IsoDate } from '@/src/types/common';
 import { toIsoDate } from '@/src/utils/format';
+import {
+  consultarPuntosConcurrentes,
+  consultarUsuariosNuevos,
+} from '@/src/features/admin/api';
 
 import * as fixtures from '../mock/fixtures/analytics';
 import { respond } from '../mock/utils';
-import { consultarUsuariosNuevos } from '@/src/features/admin/api';
 
 export type RankingKind = 'conductores' | 'puntos' | 'usuarios';
 
@@ -32,13 +35,12 @@ export type DateRange = {
   to?: IsoDate | null;
 };
 
-const rankings: Record<RankingKind, RankingQuery> = {
+const rankings: Record<Exclude<RankingKind, 'puntos'>, RankingQuery> = {
   conductores: fixtures.topDrivers,
-  puntos: fixtures.busiestPoints,
   usuarios: fixtures.mostActiveUsers,
 };
 
-function matches(name: string, institution: InstitutionCode, filters: TableFilters): boolean {
+function matches(name: string, institution: string, filters: TableFilters): boolean {
   if (filters.institution && institution !== filters.institution) return false;
   const term = filters.search?.trim().toLowerCase();
   return !term || name.toLowerCase().includes(term);
@@ -51,8 +53,21 @@ export async function listInstitutionFilterOptions(): Promise<InstitutionFilterO
 /** "Top N" de conductores, puntos de recogida o usuarios. */
 export async function getRanking(
   kind: RankingKind,
-  filters: TableFilters & { top: number },
+  filters: TableFilters &
+    DateRange & {
+      top: number;
+      institutionId?: number;
+    },
 ): Promise<RankingQuery> {
+  if (kind === 'puntos') {
+    return consultarPuntosConcurrentes({
+      desde: filters.from ?? undefined,
+      hasta: filters.to ?? undefined,
+      institucionId: filters.institutionId,
+      top: filters.top,
+    });
+  }
+
   const query = rankings[kind];
   const entries = query.entries.filter((entry) => matches(entry.name, entry.institution, filters));
   return respond({ ...query, entries: entries.slice(0, Math.max(0, filters.top)) });
