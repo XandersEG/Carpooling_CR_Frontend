@@ -53,7 +53,7 @@ export function Screen({
           {celular ? null : <Text style={styles.subtitulo}>{subtitle}</Text>}
         </View>
         {celular ? null : action}
-        {sesion ? (
+        {nombre ? (
           angosta ? (
             // el nombre y el rol se ven en el menú; aquí solo cabe el avatar
             <View style={styles.avatar} accessibilityLabel={nombre}>
