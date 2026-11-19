@@ -39,7 +39,7 @@ async function readMessage(response: Response): Promise<string> {
 }
 
 type RequestOptions = {
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
 };
 
@@ -75,6 +75,9 @@ export async function apiRequest<T>(path: string, { method = 'GET', body }: Requ
       if (response.status === 401 && getSessionToken() === token) setSessionToken(null);
       throw new ApiError(response.status, await readMessage(response));
     }
+
+    // 204 No Content (e.g. after a DELETE) has no body to parse.
+    if (response.status === 204) return undefined as T;
 
     try {
       return (await response.json()) as T;

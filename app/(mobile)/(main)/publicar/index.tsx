@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BottomSheet } from '@/components/mobile/BottomSheet';
 import { CalendarPicker } from '@/components/mobile/CalendarPicker';
@@ -14,26 +14,34 @@ import {
   StepTabs,
   type PublishStep,
 } from '@/components/mobile/driver/PublishParts';
-import { PublishRouteMap } from '@/components/mobile/driver/RouteMaps';
+import { LocationPickerMap, type PickTarget } from '@/components/mobile/driver/LocationPickerMap';
 import { VehicleCard } from '@/components/mobile/driver/VehicleCard';
+import { NoticeBox } from '@/components/mobile/Detail';
 import { Stepper } from '@/components/mobile/Form';
 import { IconPlus } from '@/components/mobile/icons';
+import { PlaceAutocomplete } from '@/components/mobile/PlaceAutocomplete';
 import { Screen } from '@/components/mobile/Screen';
 import { ScreenHeader } from '@/components/mobile/ScreenHeader';
 import { SearchField } from '@/components/mobile/SearchField';
 import { formatSlot, TimeSlotPicker } from '@/components/mobile/TimeSlotPicker';
 import { Button } from '@/components/shared/Button';
-import { colors, fonts, palette, radius, spacing, typography } from '@/src/constants/theme';
-import { listCatalog } from '@/src/services/admin/catalogService';
-import { publishTrip } from '@/src/services/driverService';
+import { colors, fonts, palette, radius, shadows, spacing, typography } from '@/src/constants/theme';
+import { listPaymentMethods, publishTrip } from '@/src/services/driverService';
+import { describePoint, type PlaceSuggestion } from '@/src/services/placeService';
 import { activateVehicle, listMyVehicles } from '@/src/services/vehicleService';
 import type { PaymentMethodItem } from '@/src/types/admin';
+import type { GeoPoint } from '@/src/types/common';
 import type { Vehicle } from '@/src/types/vehicle';
 import { now } from '@/src/utils/clock';
 import { formatPassengers, formatRelativeDay, toIsoDate } from '@/src/utils/format';
 
+/** Height of the map hidden behind the title and fields card, so fitted points stay visible. */
+const ROUTE_CARD_INSET = 200;
+
 /** Hora inicial del diseño ("6:30 a. m."). */
 const DEFAULT_TIME = '06:30';
+/** Shown in a field while the address of its pin is being looked up. */
+const LOOKING_UP_ADDRESS = 'Buscando dirección…';
 
 /**
  * Asistente "Publicar Viaje" (Movil Punto 3): Vehículo (2390:1976), Ruta
@@ -46,9 +54,15 @@ export default function PublishTripScreen() {
   const [vehicles, setVehicles] = useState<Vehicle[] | null>(null);
   const [toActivate, setToActivate] = useState<Vehicle | null>(null);
   const [activating, setActivating] = useState(false);
+  // Backend error on activation; shown inside the dialog so the driver can retry
+  const [activationError, setActivationError] = useState<string | null>(null);
 
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
+  // points picked on the map; the Backend needs coordinates for both
+  const [originPoint, setOriginPoint] = useState<GeoPoint | null>(null);
+  const [destinationPoint, setDestinationPoint] = useState<GeoPoint | null>(null);
+  const [mapTarget, setMapTarget] = useState<PickTarget>('origen');
 
   const today = useMemo(() => toIsoDate(now()), []);
   const [date, setDate] = useState(today);
@@ -76,7 +90,7 @@ export default function PublishTripScreen() {
   );
 
   useEffect(() => {
-    listCatalog('metodos-pago').then((items) => {
+    listPaymentMethods().then((items) => {
       const available = items.filter((item) => item.active);
       setMethods(available);
       setMethodId((current) => current ?? available.find((item) => paymentKind(item.name) === 'efectivo')?.id ?? null);
@@ -96,12 +110,70 @@ export default function PublishTripScreen() {
   // "Si el monto es 0 se publicará como gratis": se usa el método Gratuito del catálogo.
   const effectiveMethod = amount === 0 ? freeMethod : (methods.find((item) => item.id === methodId) ?? null);
 
+  // latest address lookup per field: a slower, older answer must not overwrite a newer pin
+  const lookupId = useRef({ origen: 0, destino: 0 });
+
+  // Uber-style: the pin and the text always match. A tapped or dragged pin rewrites its
+  // field with the address; after marking the origin, the next tap marks the destination.
+  const pickPoint = (target: PickTarget, point: GeoPoint) => {
+    // close the keyboard and the suggestion list so the map gets the attention
+    Keyboard.dismiss();
+    const setName = target === 'origen' ? setOrigin : setDestination;
+    if (target === 'origen') {
+      setOriginPoint(point);
+      if (!destinationPoint) setMapTarget('destino');
+    } else {
+      setDestinationPoint(point);
+    }
+
+    const id = ++lookupId.current[target];
+    setName(LOOKING_UP_ADDRESS);
+    describePoint(point)
+      .catch(() => null)
+      .then((place) => {
+        if (lookupId.current[target] !== id) return;
+        // without an address the point is still valid; the driver can rename it
+        setName(place?.name ?? 'Punto en el mapa');
+      });
+  };
+
+  // the driver's real-time location is the default origin (only while the origin is empty)
+  const applyMyLocation = (point: GeoPoint) => {
+    if (origin.trim() || originPoint) return;
+    setOriginPoint(point);
+    if (!destinationPoint) setMapTarget('destino');
+    const id = ++lookupId.current.origen;
+    setOrigin(LOOKING_UP_ADDRESS);
+    describePoint(point)
+      .catch(() => null)
+      .then((place) => {
+        if (lookupId.current.origen === id) setOrigin(place?.name ?? 'Punto en el mapa');
+      });
+  };
+
+  // a picked suggestion sets the field's name and its point on the map
+  const selectPlace = (target: PickTarget, place: PlaceSuggestion) => {
+    // a pending address lookup for this field no longer applies
+    lookupId.current[target]++;
+    if (target === 'origen') {
+      setOrigin(place.name);
+      setOriginPoint(place.point);
+      if (!destinationPoint) setMapTarget('destino');
+    } else {
+      setDestination(place.name);
+      setDestinationPoint(place.point);
+    }
+  };
+
   const confirmActivation = async () => {
     if (!toActivate) return;
     setActivating(true);
+    setActivationError(null);
     try {
       setVehicles(await activateVehicle(toActivate.id));
       setToActivate(null);
+    } catch (cause) {
+      setActivationError(cause instanceof Error ? cause.message : 'No se pudo activar el vehículo.');
     } finally {
       setActivating(false);
     }
@@ -110,6 +182,10 @@ export default function PublishTripScreen() {
   const confirmTrip = async () => {
     if (!activeVehicle) return setError('Elige el vehículo que utilizas para realizar viajes');
     if (!origin.trim() || !destination.trim()) return setError('Indica el punto de partida y el destino del viaje');
+    if (origin === LOOKING_UP_ADDRESS || destination === LOOKING_UP_ADDRESS) {
+      return setError('Espera a que se cargue la dirección del punto marcado');
+    }
+    if (!originPoint || !destinationPoint) return setError('Marca el origen y el destino en el mapa');
     if (!effectiveMethod) return setError('Define cómo se realizará el pago');
     setError(null);
     setPublishing(true);
@@ -117,13 +193,18 @@ export default function PublishTripScreen() {
       await publishTrip({
         vehicleId: activeVehicle.id,
         origin: { name: origin.trim() },
+        originPoint,
         destination: { name: destination.trim() },
+        destinationPoint,
         departureAt: buildDepartureAt(date, time),
         seats,
         costPerPassenger: amount,
         paymentMethodId: effectiveMethod.id,
       });
       router.replace('/publicar/publicado');
+    } catch (cause) {
+      // show the Backend's message (e.g. "El vehículo solo admite 4 pasajeros.")
+      setError(cause instanceof Error ? cause.message : 'No se pudo publicar el viaje.');
     } finally {
       setPublishing(false);
     }
@@ -131,6 +212,22 @@ export default function PublishTripScreen() {
 
   const dateLabel = formatRelativeDay(buildDepartureAt(date, time));
   const timeLabel = formatSlot(time);
+
+  // only drivers publish: a user becomes a driver when registering their first vehicle
+  // (the Backend also rejects trips from users without one)
+  if (vehicles !== null && vehicles.length === 0) {
+    return (
+      <Screen
+        scroll
+        header={<ScreenHeader title="Publicar Viaje" onBack={() => router.navigate('/inicio')} />}
+        contentStyle={styles.content}
+      >
+        <SectionTitle title="Aún no eres conductor" subtitle="Para publicar viajes primero registra un vehículo" />
+        <NoticeBox text="Cuando registres tu vehículo podrás ofrecer viajes y recibir solicitudes de pasajeros." />
+        <Button title="Registrar vehículo" onPress={() => router.push('/vehiculos/nuevo')} fullWidth />
+      </Screen>
+    );
+  }
 
   const header = (
     <View style={styles.headerBlock}>
@@ -161,7 +258,13 @@ export default function PublishTripScreen() {
   }
 
   return (
-    <Screen scroll header={header} footer={footer} contentStyle={styles.content}>
+    // the Ruta step does not scroll: its map fills the visible space under the fields
+    <Screen
+      scroll={step !== 'ruta'}
+      header={header}
+      footer={footer}
+      contentStyle={step === 'ruta' ? styles.routeContent : styles.content}
+    >
       {step === 'vehiculo' ? (
         <>
           <SectionTitle title="Mis vehículos" subtitle="Elige el vehículo que utilizas para realizar viajes" />
@@ -182,20 +285,56 @@ export default function PublishTripScreen() {
       ) : null}
 
       {step === 'ruta' ? (
-        <>
-          <SectionTitle title="Ruta" subtitle="Indica el punto de partida y el destino del viaje" />
-          <FieldGroup style={styles.groupSpacing}>
-            <SearchField kind="origen" value={origin} placeholder="Origen" onChangeText={setOrigin} />
-            <SearchField kind="destino" value={destination} placeholder="Destino" onChangeText={setDestination} />
-          </FieldGroup>
-          <PublishRouteMap
-            origin={origin.trim() || 'Origen'}
-            destination={destination.trim() || 'Destino'}
-            style={styles.map}
+        <View style={styles.routeArea}>
+          {/* full-width map behind the title and the fields card */}
+          <LocationPickerMap
+            origin={originPoint}
+            destination={destinationPoint}
+            target={mapTarget}
+            onPick={pickPoint}
+            onLocated={applyMyLocation}
+            originLabel={origin.trim()}
+            destinationLabel={destination.trim()}
+            topInset={ROUTE_CARD_INSET}
+            // the hint at the bottom of the map
+            bottomInset={64}
+            style={styles.routeMap}
           />
-          {/* Dato de muestra del diseño: no hay servicio de rutas que calcule distancia y tiempo. */}
-          <Text style={styles.note}>Distancia aproximada: 24 km  •  Tiempo estimado: 50 min</Text>
-        </>
+          <View style={styles.routeTitle}>
+            <SectionTitle title="Ruta" subtitle="Indica el punto de partida y el destino del viaje" />
+          </View>
+          <View style={styles.routeCardWrapper}>
+            {/* white band behind the top half of the card, as in "Buscar rutas" */}
+            <View style={styles.routeCardBackdrop} />
+            <FieldGroup>
+              {/* focusing a field chooses which point the next tap on the map sets */}
+              <PlaceAutocomplete
+                kind="origen"
+                value={origin}
+                placeholder="Origen"
+                onChangeText={setOrigin}
+                onSelect={(place) => selectPlace('origen', place)}
+                inputProps={{ onFocus: () => setMapTarget('origen') }}
+              />
+              <PlaceAutocomplete
+                kind="destino"
+                value={destination}
+                placeholder="Destino"
+                onChangeText={setDestination}
+                onSelect={(place) => selectPlace('destino', place)}
+                inputProps={{ onFocus: () => setMapTarget('destino') }}
+              />
+            </FieldGroup>
+          </View>
+          {/* hint floating at the bottom of the map */}
+          <View style={styles.routeHint} pointerEvents="none">
+            <Text style={styles.routeHintText}>
+              {Platform.OS === 'web'
+                ? 'El mapa interactivo solo está disponible en la app móvil.'
+                : `Escribe un lugar o toca el mapa para marcar el ${mapTarget === 'origen' ? 'origen' : 'destino'}.`}
+            </Text>
+          </View>
+        </View>
       ) : null}
 
       {step === 'horario' ? (
@@ -311,7 +450,11 @@ export default function PublishTripScreen() {
         confirmLabel="Activar"
         confirmVariant="primary"
         loading={activating}
-        onCancel={() => setToActivate(null)}
+        error={activationError}
+        onCancel={() => {
+          setToActivate(null);
+          setActivationError(null);
+        }}
         onConfirm={confirmActivation}
       />
     </Screen>
@@ -342,8 +485,50 @@ const styles = StyleSheet.create({
   sectionGap: {
     marginTop: spacing.xl * 3,
   },
-  map: {
-    marginTop: spacing.xl * 3,
+  routeContent: {
+    flex: 1,
+  },
+  routeArea: {
+    flex: 1,
+  },
+  routeMap: {
+    ...StyleSheet.absoluteFill,
+    height: '100%',
+  },
+  routeTitle: {
+    paddingTop: 20,
+    paddingHorizontal: spacing.screen,
+    backgroundColor: colors.background,
+  },
+  routeCardWrapper: {
+    paddingTop: spacing.xl,
+    paddingHorizontal: spacing.screen,
+  },
+  routeCardBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '55%',
+    backgroundColor: colors.background,
+  },
+  routeHint: {
+    position: 'absolute',
+    left: spacing.screen,
+    right: spacing.screen,
+    bottom: spacing.m,
+    alignItems: 'center',
+  },
+  routeHintText: {
+    ...typography.textSmall,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.xs,
+    overflow: 'hidden',
+    textAlign: 'center',
+    color: colors.textPrimary,
+    backgroundColor: colors.background,
+    borderRadius: radius.card,
+    ...shadows.mapLabel,
   },
   note: {
     ...typography.subtitle,

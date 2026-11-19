@@ -1,8 +1,8 @@
 /**
  * Sesión del usuario de la app móvil.
  *
- * Provisional: el token vive en memoria hasta que el inicio de sesión lo guarde
- * con `setSessionToken` y se defina dónde persistirlo.
+ * Provisional: el token vive solo en memoria y se pierde al recargar o cerrar la
+ * app, hasta que se defina dónde persistirlo.
  */
 let sessionToken: string | null = null;
 

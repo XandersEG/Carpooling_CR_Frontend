@@ -45,6 +45,8 @@ export default function VehicleFormScreen() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
+  // Backend error on save (e.g. duplicated plate)
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     clearPhotoDraft();
@@ -100,11 +102,14 @@ export default function VehicleFormScreen() {
       photoUrls: photos,
     };
     setSaving(true);
+    setSaveError(null);
     try {
       if (isNew) await createVehicle(input);
       else await updateVehicle(id, input);
       clearPhotoDraft();
       goBack();
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : 'No se pudo guardar el vehículo.');
     } finally {
       setSaving(false);
     }
@@ -125,6 +130,7 @@ export default function VehicleFormScreen() {
       contentStyle={styles.content}
       footer={
         <View style={styles.footer}>
+          {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
           <Button title="Guardar datos" loading={saving} onPress={save} style={styles.footerButton} />
           <Button title="Cancelar" variant="soft" disabled={saving} onPress={goBack} style={styles.footerButton} />
         </View>
@@ -205,6 +211,11 @@ export default function VehicleFormScreen() {
 }
 
 const styles = StyleSheet.create({
+  error: {
+    ...typography.textSmall,
+    alignSelf: 'stretch',
+    color: colors.error,
+  },
   header: {
     paddingBottom: 0,
   },

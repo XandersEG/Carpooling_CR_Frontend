@@ -40,6 +40,9 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   async function handleLogin() {
+    // Enter sigue activo mientras el botón está deshabilitado, y cada envío abriría otra sesión.
+    if (loading) return;
+
     const validationErrors = validate(email, password);
     setErrors(validationErrors);
     setFormError(null);
@@ -50,8 +53,7 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      await login({ email: email.trim(), password });
-      // TODO: guardar la sesión cuando el contrato de autenticación esté definido con Backend.
+      await login({ correo: email.trim(), password });
       router.replace('/inicio');
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'No se pudo iniciar sesión.');
