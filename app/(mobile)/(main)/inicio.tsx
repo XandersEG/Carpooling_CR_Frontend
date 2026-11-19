@@ -12,11 +12,12 @@ import { ShortcutTile } from '@/components/mobile/ShortcutTile';
 import { IconBuscar, IconCar, IconList, IconPlus, IconReloj } from '@/components/mobile/icons';
 import { useServiceData } from '@/components/mobile/passenger/useServiceData';
 import { colors, palette, radius, shadows, spacing, typography } from '@/src/constants/theme';
-import { getProfile, getSavedPlaces } from '@/src/services/profileService';
+import { getGreetingName, getSavedPlaces } from '@/src/services/profileService';
 
 /** "Menu Home" (Figma 2467:2462). */
 export default function InicioScreen() {
-  const profile = useServiceData(getProfile, []);
+  // real name of the logged-in user (GET /auth/me)
+  const greetingName = useServiceData(getGreetingName, []);
   const places = useServiceData(getSavedPlaces, []);
   // destination marked on the map ("¿A dónde vas?" with a tap instead of typing)
   const [destination, setDestination] = useState<{ name: string; point: GeoPoint } | null>(null);
@@ -68,7 +69,7 @@ export default function InicioScreen() {
           accessibilityLabel="Tuanis Carpooling"
         />
         <Text accessibilityRole="header" style={styles.greeting} numberOfLines={1}>
-          {profile.data ? `Hola, ${profile.data.displayName}` : 'Hola'}
+          {greetingName.data ? `Hola, ${greetingName.data}` : 'Hola'}
         </Text>
         <Text style={styles.subtitle}>¿A dónde quieres ir hoy?</Text>
       </View>
