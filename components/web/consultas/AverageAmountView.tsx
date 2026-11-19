@@ -31,6 +31,10 @@ function shortInstitution(name: string): string {
   return name;
 }
 
+function inicioDelAnio(fecha: IsoDate): IsoDate {
+  return `${fecha.slice(0, 4)}-01-01`;
+}
+
 const money = (amount: number | null) => amount === null ? 'Sin datos' : formatColones(amount);
 
 /** Consulta 5 · Monto promedio (340:3079) con tooltips `Promedio1–4` al pasar el cursor. */
@@ -40,8 +44,8 @@ export function AverageAmountView() {
   ]);
   const [institutionIds, setInstitutionIds] = useState<Record<string, number>>({});
   const [institution, setInstitution] = useState(ALL_INSTITUTIONS);
-  const [from, setFrom] = useState<IsoDate | null>(null);
-  const [to, setTo] = useState<IsoDate | null>(null);
+  const [from, setFrom] = useState<IsoDate | null>(() =>inicioDelAnio(toIsoDate(new Date())),);
+  const [to, setTo] = useState<IsoDate | null>(() => toIsoDate(new Date()));
   const [query, setQuery] = useState<RespuestaMontoPromedio | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,9 +105,11 @@ export function AverageAmountView() {
   const scale = chartScale(chartData.map((item) => item.value));
 
   const reset = () => {
+    const hoy = toIsoDate(new Date());
+    
     setInstitution(ALL_INSTITUTIONS);
-    setFrom(null);
-    setTo(null);
+    setFrom(inicioDelAnio(hoy));
+    setTo(hoy);
   };
 
   return (
