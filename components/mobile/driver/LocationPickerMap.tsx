@@ -5,6 +5,7 @@ import MapView, { Marker, Polyline, type MapPressEvent, type Region } from 'reac
 import { MapView as StaticMap } from '@/components/mobile/MapView';
 import { MapZoomButtons, ZOOM_IN, ZOOM_OUT, zoomMap } from '@/components/mobile/MapZoomButtons';
 import { useAfterTransition } from '@/components/mobile/useAfterTransition';
+import { useUserLocation } from '@/components/mobile/useUserLocation';
 import { colors, palette } from '@/src/constants/theme';
 import type { GeoPoint } from '@/src/types/common';
 
@@ -23,6 +24,8 @@ export type LocationPickerMapProps = {
   topInset?: number;
   /** false keeps the camera still when a point changes (the tapped point is already in view). */
   followPoints?: boolean;
+  /** Called once with the user's real-time location (first GPS fix), to use it as a default. */
+  onLocated?: (point: GeoPoint) => void;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -61,10 +64,23 @@ export function LocationPickerMap({
   destinationLabel,
   topInset = 0,
   followPoints = true,
+  onLocated,
   style,
 }: LocationPickerMapProps) {
   const mapRef = useRef<MapView>(null);
   const ready = useAfterTransition();
+  const { granted } = useUserLocation((point) => {
+    // with nothing marked yet, the map starts where the user is
+    if (!origin && !destination) {
+      mapRef.current?.animateToRegion({
+        latitude: point.lat,
+        longitude: point.lng,
+        latitudeDelta: 0.03,
+        longitudeDelta: 0.03,
+      });
+    }
+    onLocated?.(point);
+  });
   // visible area, needed by the zoom buttons
   const region = useRef<Region | null>(INITIAL_REGION);
 
@@ -97,6 +113,8 @@ export function LocationPickerMap({
         style={StyleSheet.absoluteFill}
         initialRegion={INITIAL_REGION}
         onPress={handlePress}
+        showsUserLocation={granted}
+        showsMyLocationButton={false}
         onRegionChangeComplete={(next) => {
           region.current = next;
         }}

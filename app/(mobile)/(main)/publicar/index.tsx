@@ -137,6 +137,20 @@ export default function PublishTripScreen() {
       });
   };
 
+  // the driver's real-time location is the default origin (only while the origin is empty)
+  const applyMyLocation = (point: GeoPoint) => {
+    if (origin.trim() || originPoint) return;
+    setOriginPoint(point);
+    if (!destinationPoint) setMapTarget('destino');
+    const id = ++lookupId.current.origen;
+    setOrigin(LOOKING_UP_ADDRESS);
+    describePoint(point)
+      .catch(() => null)
+      .then((place) => {
+        if (lookupId.current.origen === id) setOrigin(place?.name ?? 'Punto en el mapa');
+      });
+  };
+
   // a picked suggestion sets the field's name and its point on the map
   const selectPlace = (target: PickTarget, place: PlaceSuggestion) => {
     // a pending address lookup for this field no longer applies
@@ -278,6 +292,7 @@ export default function PublishTripScreen() {
             destination={destinationPoint}
             target={mapTarget}
             onPick={pickPoint}
+            onLocated={applyMyLocation}
             originLabel={origin.trim()}
             destinationLabel={destination.trim()}
             topInset={ROUTE_CARD_INSET}

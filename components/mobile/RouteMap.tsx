@@ -7,6 +7,7 @@ import { colors, palette } from '@/src/constants/theme';
 import { MapView } from './MapView';
 import { MapZoomButtons, ZOOM_IN, ZOOM_OUT, zoomMap } from './MapZoomButtons';
 import { useAfterTransition } from './useAfterTransition';
+import { useUserLocation } from './useUserLocation';
 import type { GeoPoint } from '@/src/types/common';
 
 /** Space covered by content on top of the map, kept clear when fitting the points. */
@@ -25,6 +26,8 @@ export type RouteMapProps = {
   /** When given, tapping the map or dragging the pickup pin sets the pickup point. */
   onPickPoint?: (point: GeoPoint) => void;
   insets?: MapInsets;
+  /** Called once with the user's real-time location (first GPS fix), to use it as a default. */
+  onLocated?: (point: GeoPoint) => void;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -60,10 +63,23 @@ export function RouteMap({
   pickupLabel,
   onPickPoint,
   insets,
+  onLocated,
   style,
 }: RouteMapProps) {
   const mapRef = useRef<NativeMapView>(null);
   const ready = useAfterTransition();
+  const { granted } = useUserLocation((point) => {
+    // with nothing marked yet, the map starts where the user is
+    if (!origin && !destination) {
+      mapRef.current?.animateToRegion({
+        latitude: point.lat,
+        longitude: point.lng,
+        latitudeDelta: 0.03,
+        longitudeDelta: 0.03,
+      });
+    }
+    onLocated?.(point);
+  });
   // visible area, needed by the zoom buttons
   const region = useRef<Region | null>(CENTRAL_VALLEY);
   const top = insets?.top ?? 0;
@@ -92,6 +108,8 @@ export function RouteMap({
       <NativeMapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
+        showsUserLocation={granted}
+        showsMyLocationButton={false}
         onRegionChangeComplete={(next) => {
           region.current = next;
         }}

@@ -90,6 +90,10 @@ export default function RecogidaScreen() {
             pickup={pickup?.point}
             pickupLabel={pickup?.name}
             onPickPoint={pickPoint}
+            // the passenger's real-time location is the default pickup point
+            onLocated={(point) => {
+              if (!pickup) pickPoint(point);
+            }}
             insets={{ top: SEARCH_CARD_INSET, bottom: pickup ? 200 : 60 }}
           />
 

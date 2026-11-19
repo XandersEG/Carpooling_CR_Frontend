@@ -58,6 +58,14 @@ export default function BuscarScreen() {
     }
   }
 
+  // the user's real-time location is the default origin (only while the origin is empty)
+  function applyMyLocation(point: GeoPoint) {
+    if (search.origin.trim() || search.originPoint) return;
+    update({ originPoint: point });
+    setMapTarget('destino');
+    lookup('origen', point, (origin) => update({ origin }));
+  }
+
   function handleSearch() {
     const next = { ...search, origin: search.origin.trim(), destination: search.destination.trim() };
     rememberSearch(next);
@@ -79,6 +87,7 @@ export default function BuscarScreen() {
         destination={search.destinationPoint ?? null}
         target={mapTarget}
         onPick={pickPoint}
+        onLocated={applyMyLocation}
         originLabel={search.origin}
         destinationLabel={search.destination}
         topInset={300}
