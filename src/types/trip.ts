@@ -58,10 +58,12 @@ export type PassengerTrip = {
 /** Parada en el recorrido de un viaje (pestaña "Paradas"). */
 export type TripStop = {
   place: Place;
+  /** Coordenadas que manda el Backend. El mapa estático (D3) todavía no las usa. */
+  point?: GeoPoint;
   /** El Backend todavía no guarda la hora estimada de las recogidas. */
   time?: IsoDateTime;
   kind: 'origen' | 'recogida' | 'destino';
-  /** Pasajero que se recoge en esta parada. */
+  /** Pasajero (o pasajeros, "Ana y Luis") que se recogen en esta parada. */
   passengerName?: string;
 };
 
