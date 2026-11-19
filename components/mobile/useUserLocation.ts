@@ -28,6 +28,21 @@ async function readPosition(): Promise<GeoPoint | null> {
   };
 }
 
+/** Fresh position for the "my location" button (asks for permission if needed). */
+export async function locateUser(): Promise<GeoPoint | null> {
+  if (!(await requestPermission())) return null;
+  try {
+    const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+    return {
+      lat: Number(position.coords.latitude.toFixed(6)),
+      lng: Number(position.coords.longitude.toFixed(6)),
+    };
+  } catch {
+    // no fresh reading (e.g. indoors): fall back to the last known one
+    return readPosition().catch(() => null);
+  }
+}
+
 /**
  * Real-time location for a map: whether the "you are here" dot can be shown, and one
  * report of the user's position when the map opens (used as the default location:

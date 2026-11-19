@@ -5,9 +5,9 @@ import NativeMapView, { Marker, Polyline, type MapPressEvent, type Region } from
 import { colors, palette } from '@/src/constants/theme';
 
 import { MapView } from './MapView';
-import { MapZoomButtons, ZOOM_IN, ZOOM_OUT, zoomMap } from './MapZoomButtons';
+import { LocateButton, MapZoomButtons, ZOOM_IN, ZOOM_OUT, zoomMap } from './MapZoomButtons';
 import { useAfterTransition } from './useAfterTransition';
-import { useUserLocation } from './useUserLocation';
+import { locateUser, useUserLocation } from './useUserLocation';
 import type { GeoPoint } from '@/src/types/common';
 
 /** Space covered by content on top of the map, kept clear when fitting the points. */
@@ -96,9 +96,17 @@ export function RouteMap({
         animated: true,
       });
     } else if (points.length === 1) {
-      map.animateToRegion({ ...toLatLng(points[0]), latitudeDelta: 0.05, longitudeDelta: 0.05 });
+      map.animateToRegion({ ...toLatLng(points[0]), latitudeDelta: 0.01, longitudeDelta: 0.01 });
     }
   }, [ready, origin?.lat, origin?.lng, destination?.lat, destination?.lng, top, bottom]);
+
+  // "my location" button: zoom in to the user; on a pickup map it also moves the pin there
+  async function goToMyLocation() {
+    const point = await locateUser();
+    if (!point) return;
+    mapRef.current?.animateToRegion({ ...toLatLng(point), latitudeDelta: 0.01, longitudeDelta: 0.01 });
+    onPickPoint?.(point);
+  }
 
   // the static map image stands in while the screen slides in
   if (!ready) return <MapView style={[styles.map, style]} />;
@@ -146,11 +154,15 @@ export function RouteMap({
         ) : null}
       </NativeMapView>
       {interactive ? (
-        <MapZoomButtons
-          style={{ top: top + 12 }}
-          onZoomIn={() => zoomMap(mapRef.current, region.current, ZOOM_IN)}
-          onZoomOut={() => zoomMap(mapRef.current, region.current, ZOOM_OUT)}
-        />
+        <>
+          <MapZoomButtons
+            style={{ top: top + 12 }}
+            onZoomIn={() => zoomMap(mapRef.current, region.current, ZOOM_IN)}
+            onZoomOut={() => zoomMap(mapRef.current, region.current, ZOOM_OUT)}
+          />
+          {/* just above whatever covers the bottom of the map */}
+          <LocateButton style={{ bottom: bottom + 16 }} onPress={goToMyLocation} />
+        </>
       ) : null}
     </View>
   );

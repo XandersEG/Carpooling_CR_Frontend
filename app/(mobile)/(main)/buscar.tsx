@@ -91,6 +91,8 @@ export default function BuscarScreen() {
         originLabel={search.origin}
         destinationLabel={search.destination}
         topInset={300}
+        // the "Buscar viaje" button
+        bottomInset={84}
       />
 
       {/* La tarjeta de búsqueda queda mitad sobre el fondo blanco y mitad sobre el mapa. */}

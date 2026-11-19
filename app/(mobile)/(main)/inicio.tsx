@@ -22,6 +22,8 @@ export default function InicioScreen() {
   const [destination, setDestination] = useState<{ name: string; point: GeoPoint } | null>(null);
   // top of the visible map strip, so the zoom buttons sit inside it
   const [mapTop, setMapTop] = useState(0);
+  // height of the bottom panel, so the "my location" button sits just above it
+  const [sheetHeight, setSheetHeight] = useState(0);
   const { lookup } = useAddressLookup();
 
   function pickDestination(point: GeoPoint) {
@@ -52,7 +54,10 @@ export default function InicioScreen() {
         onPick={(_, point) => pickDestination(point)}
         destinationLabel={destination?.name}
         topInset={mapTop}
+        // the panel, plus the "Buscar viajes a…" button when a destination is marked
+        bottomInset={sheetHeight + (destination ? 70 : 0)}
         followPoints={false}
+        pinOnLocate={false}
       />
 
       <View style={styles.header}>
@@ -106,7 +111,7 @@ export default function InicioScreen() {
         ) : null}
       </View>
 
-      <View style={styles.sheet}>
+      <View style={styles.sheet} onLayout={(event) => setSheetHeight(event.nativeEvent.layout.height)}>
         <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false} bounces={false}>
           <View style={styles.shortcuts}>
             <ShortcutTile label="Buscar viaje" Icon={IconCar} onPress={() => router.push('/buscar')} />

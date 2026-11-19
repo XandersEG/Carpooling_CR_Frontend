@@ -3,9 +3,9 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import MapView, { Marker, Polyline, type MapPressEvent, type Region } from 'react-native-maps';
 
 import { MapView as StaticMap } from '@/components/mobile/MapView';
-import { MapZoomButtons, ZOOM_IN, ZOOM_OUT, zoomMap } from '@/components/mobile/MapZoomButtons';
+import { LocateButton, MapZoomButtons, ZOOM_IN, ZOOM_OUT, zoomMap } from '@/components/mobile/MapZoomButtons';
 import { useAfterTransition } from '@/components/mobile/useAfterTransition';
-import { useUserLocation } from '@/components/mobile/useUserLocation';
+import { locateUser, useUserLocation } from '@/components/mobile/useUserLocation';
 import { colors, palette } from '@/src/constants/theme';
 import type { GeoPoint } from '@/src/types/common';
 
@@ -22,8 +22,12 @@ export type LocationPickerMapProps = {
   destinationLabel?: string;
   /** Map height covered by content on top (e.g. a fields card), kept clear when fitting the points. */
   topInset?: number;
+  /** Map height covered by content at the bottom (a button, a panel), kept clear too. */
+  bottomInset?: number;
   /** false keeps the camera still when a point changes (the tapped point is already in view). */
   followPoints?: boolean;
+  /** true: the "my location" button also pins the current target there (like tapping it). */
+  pinOnLocate?: boolean;
   /** Called once with the user's real-time location (first GPS fix), to use it as a default. */
   onLocated?: (point: GeoPoint) => void;
   style?: StyleProp<ViewStyle>;
@@ -63,7 +67,9 @@ export function LocationPickerMap({
   originLabel,
   destinationLabel,
   topInset = 0,
+  bottomInset = 0,
   followPoints = true,
+  pinOnLocate = true,
   onLocated,
   style,
 }: LocationPickerMapProps) {
@@ -90,17 +96,25 @@ export function LocationPickerMap({
     if (!map || !followPoints) return;
     if (origin && destination) {
       map.fitToCoordinates([toLatLng(origin), toLatLng(destination)], {
-        edgePadding: { top: 60 + topInset, right: 60, bottom: 60, left: 60 },
+        edgePadding: { top: 60 + topInset, right: 60, bottom: 60 + bottomInset, left: 60 },
         animated: true,
       });
     } else if (origin || destination) {
       const point = (origin ?? destination) as GeoPoint;
-      map.animateToRegion({ ...toLatLng(point), latitudeDelta: 0.05, longitudeDelta: 0.05 });
+      map.animateToRegion({ ...toLatLng(point), latitudeDelta: 0.01, longitudeDelta: 0.01 });
     }
-  }, [ready, followPoints, origin, destination, topInset]);
+  }, [ready, followPoints, origin, destination, topInset, bottomInset]);
 
   const handlePress = (event: MapPressEvent) => {
     onPick(target, toGeoPoint(event.nativeEvent.coordinate));
+  };
+
+  // "my location" button: zoom in to the user and, in a picker, pin the current target there
+  const goToMyLocation = async () => {
+    const point = await locateUser();
+    if (!point) return;
+    mapRef.current?.animateToRegion({ ...toLatLng(point), latitudeDelta: 0.01, longitudeDelta: 0.01 });
+    if (pinOnLocate) onPick(target, point);
   };
 
   // the static map image stands in while the screen slides in
@@ -150,6 +164,8 @@ export function LocationPickerMap({
         onZoomIn={() => zoomMap(mapRef.current, region.current, ZOOM_IN)}
         onZoomOut={() => zoomMap(mapRef.current, region.current, ZOOM_OUT)}
       />
+      {/* just above whatever covers the bottom of the map */}
+      <LocateButton style={{ bottom: bottomInset + 16 }} onPress={goToMyLocation} />
     </View>
   );
 }

@@ -296,6 +296,8 @@ export default function PublishTripScreen() {
             originLabel={origin.trim()}
             destinationLabel={destination.trim()}
             topInset={ROUTE_CARD_INSET}
+            // the hint at the bottom of the map
+            bottomInset={64}
             style={styles.routeMap}
           />
           <View style={styles.routeTitle}>

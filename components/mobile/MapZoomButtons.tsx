@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import type MapView from 'react-native-maps';
 import type { Region } from 'react-native-maps';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import { colors, palette, radius, shadows } from '@/src/constants/theme';
 
@@ -16,6 +17,36 @@ export function zoomMap(map: MapView | null, region: Region | null, factor: numb
   const latitudeDelta = Math.min(MAX_DELTA, Math.max(MIN_DELTA, region.latitudeDelta * factor));
   const longitudeDelta = Math.min(MAX_DELTA, Math.max(MIN_DELTA, region.longitudeDelta * factor));
   map.animateToRegion({ ...region, latitudeDelta, longitudeDelta }, 250);
+}
+
+/** Bold crosshair for the "my location" button (no icon for it in the design). */
+function LocateIcon() {
+  return (
+    <Svg width={26} height={26} viewBox="0 0 26 26" fill="none">
+      <Circle cx={13} cy={13} r={7.5} stroke={palette.black} strokeWidth={2.6} />
+      <Circle cx={13} cy={13} r={3.2} fill={palette.black} />
+      <Path d="M13 1.5v4M13 20.5v4M1.5 13h4M20.5 13h4" stroke={palette.black} strokeWidth={2.6} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+type LocateButtonProps = {
+  onPress: () => void;
+  style?: StyleProp<ViewStyle>;
+};
+
+/** Round "my location" button at the bottom right of a map (as in Uber). */
+export function LocateButton({ onPress, style }: LocateButtonProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Ir a mi ubicación"
+      onPress={onPress}
+      style={({ pressed }) => [styles.locate, style, pressed ? styles.pressed : null]}
+    >
+      <LocateIcon />
+    </Pressable>
+  );
 }
 
 type MapZoomButtonsProps = {
@@ -75,6 +106,17 @@ const styles = StyleSheet.create({
     fontSize: 22,
     lineHeight: 24,
     color: colors.textPrimary,
+  },
+  locate: {
+    position: 'absolute',
+    right: 16,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: palette.white,
+    boxShadow: '0px 3px 10px rgba(0, 0, 0, 0.22)',
   },
   divider: {
     height: StyleSheet.hairlineWidth,
