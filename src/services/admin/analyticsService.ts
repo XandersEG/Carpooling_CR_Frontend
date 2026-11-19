@@ -1,10 +1,8 @@
 /**
  * Consultas generales y Estadísticas del portal administrativo.
  *
- * Provisional: implementación simulada con las cifras de los diseños. Los
- * filtros se aplican del lado del cliente solo donde los datos lo permiten
- * (institución y nombre en las tablas, fechas en el listado de viajes); los
- * totales de las etiquetas no se recalculan.
+ * Provisional: la mayoría de las consultas usa datos de ejemplo. "Usuarios
+ * nuevos" ya consulta el back end; las demás conservan los fixtures del diseño.
  */
 import type {
   AverageAmountQuery,
@@ -20,6 +18,7 @@ import { toIsoDate } from '@/src/utils/format';
 
 import * as fixtures from '../mock/fixtures/analytics';
 import { respond } from '../mock/utils';
+import { consultarUsuariosNuevos } from '@/src/features/admin/api';
 
 export type RankingKind = 'conductores' | 'puntos' | 'usuarios';
 
@@ -78,13 +77,16 @@ export async function getAverageAmount(filters: TableFilters): Promise<AverageAm
   return respond({ ...query, byInstitution });
 }
 
-/** Usuarios nuevos de los últimos `months` meses (el diseño muestra 4 meses de datos). */
-export async function getNewUsers(filters: TableFilters & { months: number }): Promise<NewUsersQuery> {
-  const query = fixtures.newUsers;
-  return respond({
-    ...query,
-    monthly: query.monthly.slice(-Math.max(1, filters.months)),
-    users: query.users.filter((user) => matches(user.fullName, user.institution, filters)),
+/* Usuarios registrados en los últimos meses. */
+export function getNewUsers(filters: {
+  institutionId?: number;
+  search?: string;
+  months: number;
+}): Promise<NewUsersQuery> {
+  return consultarUsuariosNuevos({
+    meses: filters.months,
+    institucionId: filters.institutionId,
+    buscar: filters.search,
   });
 }
 
