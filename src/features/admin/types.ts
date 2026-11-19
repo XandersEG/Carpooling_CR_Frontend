@@ -29,7 +29,7 @@ export type ValorCatalogo = {
 export type Institucion = {
   id: number;
   nombre: string;
-  // las instituciones registradas antes de pedirlo no lo tienen
+  // es opcional: una institución puede no tenerlo
   acronimo: string | null;
   dominioCorreo: string;
   activo: boolean;

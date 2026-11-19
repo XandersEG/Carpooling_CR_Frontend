@@ -77,7 +77,7 @@ function InstitutionDialog({ institucion, onClose, onSaved }: DialogProps) {
     >
       <Field label="Nombre" value={nombre} onChangeText={setNombre} maxLength={150} autoFocus />
       <Field
-        label="Acrónimo"
+        label="Acrónimo (opcional)"
         value={acronimo}
         onChangeText={setAcronimo}
         placeholder="Ej: TEC"
