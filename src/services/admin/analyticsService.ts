@@ -1,8 +1,8 @@
 /**
  * Consultas generales y Estadísticas del portal administrativo.
  *
- * Provisional: "Puntos concurrentes" y "Usuarios nuevos" consultan el back end;
- * las demás conservan los fixtures del diseño.
+ * "Puntos concurrentes", "Top Conductores", "Usuarios activos" y "Usuarios
+ * nuevos" consultan el back end; las demás conservan los fixtures del diseño.
  */
 import type {
   AgeRangeStat,
@@ -21,6 +21,7 @@ import { toIsoDate } from '@/src/utils/format';
 import {
   consultarPuntosConcurrentes,
   consultarTopConductores,
+  consultarUsuariosActivos,
   consultarUsuariosNuevos,
 } from '@/src/features/admin/api';
 
@@ -41,11 +42,6 @@ export type TableFilters = {
 export type DateRange = {
   from?: IsoDate | null;
   to?: IsoDate | null;
-};
-
-const rankings: Record<Exclude<RankingKind, 'puntos'>, RankingQuery> = {
-  conductores: fixtures.topDrivers,
-  usuarios: fixtures.mostActiveUsers,
 };
 
 function matches(name: string, institution: string, filters: TableFilters): boolean {
@@ -93,9 +89,23 @@ export async function getRanking(
     };
   }
 
-  const query = rankings[kind];
-  const entries = query.entries.filter((entry) => matches(entry.name, entry.institution, filters));
-  return respond({ ...query, entries: entries.slice(0, Math.max(0, filters.top)) });
+  if (kind === 'usuarios') {
+    const result = await consultarUsuariosActivos({
+      top: filters.top,
+      institucionId: filters.institutionId,
+      buscar: filters.search?.trim() || undefined,
+    });
+    return {
+      entries: result.usuarios.map((entry) => ({
+        id: String(entry.usuarioId),
+        name: entry.usuario,
+        institution: entry.institucion,
+        trips: entry.viajesFinalizados,
+      })),
+      totalWithRecords: result.totalUsuarios,
+    };
+  }
+  throw new Error(`Tipo de ranking no reconocido: ${kind}`);
 }
 
 export async function listTrips(filters: TableFilters & DateRange): Promise<TripListEntry[]> {

@@ -12,6 +12,7 @@ export const ALL_INSTITUTIONS = 'Todas las instituciones';
 export function useInstitutionOptions(
   source: 'mock' | 'admin' = 'mock',
   onError?: (message: string | null) => void,
+  activeOnly = false,
 ): InstitutionFilterOption[] {
   const [options, setOptions] = useState<InstitutionFilterOption[]>([{ label: ALL_INSTITUTIONS, code: null }]);
   useEffect(() => {
@@ -20,11 +21,13 @@ export function useInstitutionOptions(
       source === 'admin'
         ? listarInstituciones().then((institutions) => [
             { label: ALL_INSTITUTIONS, code: null },
-            ...institutions.map((institution) => ({
-              label: institution.nombre,
-              code: null,
-              id: institution.id,
-            })),
+            ...institutions
+              .filter((institution) => !activeOnly || institution.activo)
+              .map((institution) => ({
+                label: institution.nombre,
+                code: null,
+                id: institution.id,
+              })),
           ])
         : listInstitutionFilterOptions();
     request.then(
@@ -40,7 +43,7 @@ export function useInstitutionOptions(
     return () => {
       mounted = false;
     };
-  }, [source, onError]);
+  }, [source, onError, activeOnly]);
   return options;
 }
 
