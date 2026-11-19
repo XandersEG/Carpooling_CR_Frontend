@@ -23,6 +23,7 @@ import {
   consultarTopConductores,
   consultarUsuariosActivos,
   consultarUsuariosNuevos,
+  consultarViajes
 } from '@/src/features/admin/api';
 
 import * as fixtures from '../mock/fixtures/analytics';
@@ -109,14 +110,23 @@ export async function getRanking(
 }
 
 export async function listTrips(filters: TableFilters & DateRange): Promise<TripListEntry[]> {
-  const trips = fixtures.tripList.filter((trip) => {
-    if (!matches(trip.driverName, trip.institution, filters)) return false;
-    const day = toIsoDate(trip.departureAt);
-    if (filters.from && day < filters.from) return false;
-    if (filters.to && day > filters.to) return false;
-    return true;
+  if (USE_MOCK_DATA) {
+    const trips = fixtures.tripList.filter((trip) => {
+      if (!matches(trip.driverName, trip.institution, filters)) return false;
+      const day = toIsoDate(trip.departureAt);
+      if (filters.from && day < filters.from) return false;
+      if (filters.to && day > filters.to) return false;
+      return true;
+    });
+    return respond(trips);
+  }
+
+  return await consultarViajes({
+    institucionId: filters.institutionId,
+    desde: filters.from ?? undefined,
+    hasta: filters.to ?? undefined,
+    buscar: filters.search?.trim() || undefined,
   });
-  return respond(trips);
 }
 
 export async function getAverageAmount(filters: TableFilters): Promise<AverageAmountQuery> {
@@ -187,6 +197,8 @@ function porRangoEdad(filas: EstadisticasRespuesta['rangoEdad'], genero: string)
   return conteos.map((fila) => ({ ...fila, percent: porcentaje(fila.count, total) }));
 }
 
+
+
 export type StatisticsFilters = {
   institucionId?: number;
   desde?: IsoDate | null;
@@ -221,30 +233,4 @@ export async function getStatistics(
 
 export async function listGenderFilterOptions(): Promise<string[]> {
   return respond(fixtures.genderFilterOptions);
-}
-
-export async function listTrips(filters: TableFilters & DateRange): Promise<TripListEntry[]> {
-  // Consultar backend
-  const rawTrips = await consultarListadoViajes({
-    desde: filters.from,
-    hasta: filters.to,
-    institucionId: filters.institutionId,
-  });
-
-  // Transformar respuesta del backend al tipo TripListEntry
-  return rawTrips
-    .map((trip) => ({
-      id: `V-${trip.id}`, // Generar código visible
-      code: `V-${trip.id}`,
-      departureAt: trip.fechaHoraSalida,
-      institution: institutionCodeFromId(trip.institucionId), // Concertir ID a codigo
-      driverName: `${trip.conductorNombre} ${trip.conductorApellidos}`,
-      origin: trip.origenNombre,
-      destination: trip.destinoNombre,
-      amount: trip.costo,
-      stops: [trip.origenNombre, trip.destinoNombre], // Simplificado, ajusta según necesidad
-      vehicle: `${trip.marca} ${trip.modelo} - ${trip.placa}`,
-      passengers: [], // Necesita consulta separada o incluirse en el backend
-    }))
-    .filter((trip) => matches(trip.driverName, trip.institution, filters));
 }
