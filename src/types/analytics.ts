@@ -17,7 +17,7 @@ export type RankingEntry = {
   id: Id;
   /** Conductor, punto de recogida o usuario. */
   name: string;
-  institution: InstitutionCode;
+  institution: string;
   /** Viajes brindados o registrados. */
   trips: number;
 };
