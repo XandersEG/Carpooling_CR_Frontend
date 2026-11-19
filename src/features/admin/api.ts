@@ -312,6 +312,27 @@ export const restablecerContrasena = (token: string, password: string) =>
 // avisa al servidor para que el token deje de servir
 export const cerrarSesionEnServidor = () => pedir<void>('/admin/auth/logout', { metodo: 'POST' });
 
+/* -------------------------- top de conductores -------------------------- */
+
+export type RespuestaTopConductores = {
+  conductores: {
+    conductorId: number;
+    conductor: string;
+    institucion: string;
+    viajesFinalizados: number;
+  }[];
+  totalConductores: number;
+};
+
+export const consultarTopConductores = (filtros: {
+  top: number;
+  institucionId?: number;
+  buscar?: string;
+}) =>
+  pedir<RespuestaTopConductores>('/admin/consultas/top-conductores', {
+    consulta: filtros,
+  });
+
 /* ------------------------ consulta monto promedio ------------------------ */
 
 // Contrato de GET /api/admin/consultas/monto-promedio del backend.

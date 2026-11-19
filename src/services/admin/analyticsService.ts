@@ -20,6 +20,7 @@ import type { IsoDate } from '@/src/types/common';
 import { toIsoDate } from '@/src/utils/format';
 import {
   consultarPuntosConcurrentes,
+  consultarTopConductores,
   consultarUsuariosNuevos,
 } from '@/src/features/admin/api';
 
@@ -33,6 +34,7 @@ export type RankingKind = 'conductores' | 'puntos' | 'usuarios';
 
 export type TableFilters = {
   institution?: InstitutionCode | null;
+  institutionId?: number;
   search?: string;
 };
 
@@ -72,6 +74,23 @@ export async function getRanking(
       institucionId: filters.institutionId,
       top: filters.top,
     });
+  }
+
+  if (kind === 'conductores') {
+    const result = await consultarTopConductores({
+      top: filters.top,
+      institucionId: filters.institutionId,
+      buscar: filters.search?.trim() || undefined,
+    });
+    return {
+      entries: result.conductores.map((entry) => ({
+        id: String(entry.conductorId),
+        name: entry.conductor,
+        institution: entry.institucion,
+        trips: entry.viajesFinalizados,
+      })),
+      totalWithRecords: result.totalConductores,
+    };
   }
 
   const query = rankings[kind];

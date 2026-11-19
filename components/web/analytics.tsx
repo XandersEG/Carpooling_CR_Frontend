@@ -145,11 +145,11 @@ export function RankBadge({ position }: { position: number }) {
   );
 }
 
-/** Pastilla gris con las siglas de la institución. */
-export function InstitutionPill({ code }: { code: string }) {
+/** Pastilla gris con el nombre de la institución. */
+export function InstitutionPill({ name }: { name: string }) {
   return (
     <View style={styles.institution}>
-      <Text style={styles.institutionText}>{code}</Text>
+      <Text style={styles.institutionText}>{name}</Text>
     </View>
   );
 }
@@ -309,18 +309,26 @@ const styles = StyleSheet.create({
     color: palette.black,
   },
   institution: {
-    width: 99,
-    height: 21,
+    width: '100%',
+    maxWidth: 220,
+    minHeight: 21,
     borderRadius: radius.webControl,
     backgroundColor: palette.greyLight,
+    alignSelf: 'flex-start',
+    marginLeft: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingRight: 8,
+    paddingVertical: 2,
   },
   institutionText: {
     fontFamily: fonts.cairoBold,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 17,
     color: palette.greyDark,
+    flexShrink: 1,
+    alignSelf: 'stretch',
+    textAlign: 'center',
   },
   barCell: {
     flexDirection: 'row',
