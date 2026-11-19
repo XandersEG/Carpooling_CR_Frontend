@@ -8,7 +8,7 @@ import { SearchSummary } from '@/components/mobile/SearchSummary';
 import { SegmentedControl } from '@/components/mobile/SegmentedControl';
 import { TripCard } from '@/components/mobile/TripCard';
 import { LoadState } from '@/components/mobile/passenger/LoadState';
-import { formatSearchDate, formatSearchTime, getLastSearch } from '@/components/mobile/passenger/search';
+import { formatSearchDate, formatSearchTime, getLastSearch, toRouteParams } from '@/components/mobile/passenger/search';
 import { TripMapView } from '@/components/mobile/passenger/TripMapView';
 import { myTripCard } from '@/components/mobile/passenger/tripHelpers';
 import { useServiceData } from '@/components/mobile/passenger/useServiceData';
@@ -59,7 +59,7 @@ export default function MisViajesScreen() {
               destination={search.destination}
               dateLabel={formatSearchDate(search.date)}
               timeLabel={formatSearchTime(search.time)}
-              onEdit={() => router.push({ pathname: '/buscar', params: search })}
+              onEdit={() => router.push({ pathname: '/buscar', params: toRouteParams(search) })}
             />
             <SegmentedControl options={VIEW_OPTIONS} value={view} onChange={setView} />
           </View>

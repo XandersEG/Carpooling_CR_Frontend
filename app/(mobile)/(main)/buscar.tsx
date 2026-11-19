@@ -15,6 +15,8 @@ import {
   formatSearchTime,
   readSearchParams,
   rememberSearch,
+  toRouteParams,
+  type SearchRouteParams,
 } from '@/components/mobile/passenger/search';
 import { Button } from '@/components/shared/Button';
 import { colors, radius, spacing } from '@/src/constants/theme';
@@ -30,7 +32,7 @@ type Panel = 'fecha' | 'hora' | null;
  * "Calendario" (2466:3869) y el "Selector hora" (2466:3962) en un panel inferior.
  */
 export default function BuscarScreen() {
-  const params = useLocalSearchParams<{ origin?: string; destination?: string; date?: string; time?: string }>();
+  const params = useLocalSearchParams<SearchRouteParams>();
   const [search, setSearch] = useState<TripSearchParams>(() => readSearchParams(params));
   const [panel, setPanel] = useState<Panel>(null);
 
@@ -41,7 +43,7 @@ export default function BuscarScreen() {
   function handleSearch() {
     const next = { ...search, origin: search.origin.trim(), destination: search.destination.trim() };
     rememberSearch(next);
-    router.push({ pathname: '/resultados', params: next });
+    router.push({ pathname: '/resultados', params: toRouteParams(next) });
   }
 
   const canSearch = search.origin.trim().length > 0 && search.destination.trim().length > 0;
@@ -59,16 +61,17 @@ export default function BuscarScreen() {
             kind="origen"
             value={search.origin}
             placeholder="Origen"
-            onChangeText={(origin) => update({ origin })}
-            onSelect={(place) => update({ origin: place.name })}
+            // typing something else drops the point of the previously picked place
+            onChangeText={(origin) => update({ origin, originPoint: undefined })}
+            onSelect={(place) => update({ origin: place.name, originPoint: place.point })}
             inputProps={{ returnKeyType: 'next' }}
           />
           <PlaceAutocomplete
             kind="destino"
             value={search.destination}
             placeholder="Destino"
-            onChangeText={(destination) => update({ destination })}
-            onSelect={(place) => update({ destination: place.name })}
+            onChangeText={(destination) => update({ destination, destinationPoint: undefined })}
+            onSelect={(place) => update({ destination: place.name, destinationPoint: place.point })}
             inputProps={{ returnKeyType: 'search', onSubmitEditing: canSearch ? handleSearch : undefined }}
           />
           <SearchField

@@ -24,6 +24,9 @@ export type Trip = {
   status: TripStatus;
   distanceKm?: number;
   estimatedMinutes?: number;
+  /** Map points of the route (only trips from the Backend have them). */
+  originPoint?: GeoPoint;
+  destinationPoint?: GeoPoint;
 };
 
 /** Filtros de la pantalla "Buscar rutas". */
@@ -33,6 +36,9 @@ export type TripSearchParams = {
   date: IsoDate;
   /** Hora de salida en formato `HH:mm`. */
   time: string;
+  /** Points of the places picked from the suggestions; without them the search does not filter by place. */
+  originPoint?: GeoPoint;
+  destinationPoint?: GeoPoint;
 };
 
 /** Solicitud de un pasajero para unirse a un viaje. */

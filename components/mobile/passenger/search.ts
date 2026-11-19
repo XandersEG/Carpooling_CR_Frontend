@@ -1,6 +1,6 @@
 import { formatSlot } from '@/components/mobile/TimeSlotPicker';
 import { USE_MOCK_DATA } from '@/src/services/config';
-import type { IsoDate } from '@/src/types/common';
+import type { GeoPoint, IsoDate } from '@/src/types/common';
 import type { TripSearchParams } from '@/src/types/trip';
 import { now } from '@/src/utils/clock';
 import { formatRelativeDay, toIsoDate } from '@/src/utils/format';
@@ -14,6 +14,10 @@ export type SearchRouteParams = {
   destination?: string;
   date?: string;
   time?: string;
+  originLat?: string;
+  originLng?: string;
+  destinationLat?: string;
+  destinationLng?: string;
 };
 
 /** Última búsqueda realizada en la sesión (resumen de "Mis Viajes"). */
@@ -37,14 +41,43 @@ function single(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+/** Point from a pair of URL params, or undefined if either is missing or not a number. */
+function readPoint(lat: string | undefined, lng: string | undefined): GeoPoint | undefined {
+  const point = { lat: Number(lat), lng: Number(lng) };
+  return lat && lng && Number.isFinite(point.lat) && Number.isFinite(point.lng) ? point : undefined;
+}
+
 /** Combina los parámetros de la URL con los valores por defecto. */
 export function readSearchParams(params: Record<string, string | string[] | undefined>): TripSearchParams {
   const base = lastSearch ?? defaultSearch();
+  const origin = single(params.origin);
+  const destination = single(params.destination);
   return {
-    origin: single(params.origin) ?? base.origin,
-    destination: single(params.destination) ?? base.destination,
+    origin: origin ?? base.origin,
+    destination: destination ?? base.destination,
     date: single(params.date) ?? base.date,
     time: single(params.time) ?? base.time,
+    // a place that comes in the URL brings its own point (or none); otherwise the remembered one is kept
+    originPoint:
+      origin !== undefined ? readPoint(single(params.originLat), single(params.originLng)) : base.originPoint,
+    destinationPoint:
+      destination !== undefined
+        ? readPoint(single(params.destinationLat), single(params.destinationLng))
+        : base.destinationPoint,
+  };
+}
+
+/** Search as flat URL params (Expo Router only passes text values). */
+export function toRouteParams(search: TripSearchParams): SearchRouteParams {
+  return {
+    origin: search.origin,
+    destination: search.destination,
+    date: search.date,
+    time: search.time,
+    originLat: search.originPoint ? String(search.originPoint.lat) : undefined,
+    originLng: search.originPoint ? String(search.originPoint.lng) : undefined,
+    destinationLat: search.destinationPoint ? String(search.destinationPoint.lat) : undefined,
+    destinationLng: search.destinationPoint ? String(search.destinationPoint.lng) : undefined,
   };
 }
 
