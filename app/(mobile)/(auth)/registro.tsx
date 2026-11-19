@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FieldWrapper, FormField, SelectField, type SelectOption } from '@/components/mobile/Form';
@@ -75,6 +75,7 @@ export default function RegistroScreen() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const genders = useServiceData(() => listCatalog('opciones-genero'), []);
   const genderOptions: SelectOption<string>[] = (genders.data ?? [])
@@ -91,6 +92,11 @@ export default function RegistroScreen() {
     setFormError(null);
     if (Object.keys(validationErrors).length > 0) return;
 
+    if (!acceptedTerms) {
+      setFormError('Debes aceptar los términos y condiciones.');
+      return;
+    }
+
     setLoading(true);
     try {
       await register({
@@ -100,6 +106,7 @@ export default function RegistroScreen() {
         roles: values.roles,
         birthDate: displayToIsoDate(values.birthDate) ?? '',
         password: values.password,
+        acceptedTerms: acceptedTerms,
       });
       // TODO: guardar la sesión cuando el contrato de autenticación esté definido con Backend.
       router.replace('/inicio');
@@ -184,7 +191,16 @@ export default function RegistroScreen() {
           />
 
           <View style={styles.terms}>
-            <AuthLink label="Términos y condiciones" onPress={() => router.push('/terminos')} />
+            <AuthLink
+              label="Términos y condiciones"
+              onPress={() => router.push('/terminos')}
+            />
+            <Text>Acepto los términos y condiciones</Text>
+            <Switch
+              accessibilityLabel="Acepto los términos y condiciones"
+              value={acceptedTerms}
+              onValueChange={setAcceptedTerms}
+            />
           </View>
 
           {formError ? <Text style={styles.formError}>{formError}</Text> : null}
