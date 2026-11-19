@@ -4,15 +4,15 @@
  *
  * Publicar, consultar, iniciar, finalizar y cancelar un viaje y listar los
  * métodos de pago usan el Backend cuando `EXPO_PUBLIC_USE_MOCKS=false`.
- * Provisional: lo demás sigue simulado.
  */
 import type { PaymentMethodItem } from '@/src/types/admin';
 import type { Id } from '@/src/types/common';
-import type { DriverTrip, IncomingRequest, IncomingRequestStatus, PublishTripInput, TripStatus, TripStop, } from '@/src/types/trip';
+import type { DriverTrip, IncomingRequest, IncomingRequestStatus, PublishTripInput, TripStatus, } from '@/src/types/trip';
 import { now } from '@/src/utils/clock';
 
 import { apiRequest } from './apiClient';
 import { USE_MOCK_DATA } from './config';
+import { buildDriverTripStops, sortAlongRoute } from './driverTripStops';
 import { db } from './mock/db';
 import { createId, delay, notFound, respond } from './mock/utils';
 type ApiPlace = { nombre: string; lat: number; lng: number };
@@ -24,6 +24,7 @@ type DriverTripResponse = {
   origen: ApiPlace;
   destino: ApiPlace;
   salida: string;
+  inicioReal: string | null;
   finReal: string | null;
   cuposTotales: number;
   cuposDisponibles: number;
@@ -53,18 +54,26 @@ function toDriverTrip(response: DriverTripResponse): DriverTrip {
   const origin = { name: response.origen.nombre };
   const destination = { name: response.destino.nombre };
   const arrivalAt = response.finReal ?? undefined;
+  const originPoint = { lat: response.origen.lat, lng: response.origen.lng };
+  const destinationPoint = { lat: response.destino.lat, lng: response.destino.lng };
 
-  const stops: TripStop[] = [
-    { place: origin, time: response.salida, kind: 'origen' },
-    ...response.pasajeros.map(
-      (passenger): TripStop => ({
-        place: { name: passenger.puntoRecogida.nombre },
-        kind: 'recogida',
-        passengerName: passenger.nombre,
-      }),
-    ),
-    { place: destination, time: arrivalAt, kind: 'destino' },
-  ];
+  // El Backend los manda en orden de aceptación; las dos pestañas van en orden de recogida.
+  const pasajeros = sortAlongRoute(originPoint, destinationPoint, response.pasajeros, ({ puntoRecogida }) => ({
+    lat: puntoRecogida.lat,
+    lng: puntoRecogida.lng,
+  }));
+
+  const stops = buildDriverTripStops({
+    origin: { name: response.origen.nombre, point: originPoint },
+    destination: { name: response.destino.nombre, point: destinationPoint },
+    departureAt: response.salida,
+    arrivalAt,
+    pickups: pasajeros.map((passenger) => ({
+      name: passenger.puntoRecogida.nombre,
+      point: { lat: passenger.puntoRecogida.lat, lng: passenger.puntoRecogida.lng },
+      passengerName: passenger.nombre,
+    })),
+  });
 
   return {
     id,
@@ -88,7 +97,7 @@ function toDriverTrip(response: DriverTripResponse): DriverTrip {
     seats: response.cuposTotales,
     availableSeats: response.cuposDisponibles,
     status: STATUS_FROM_API[response.estado],
-    passengers: response.pasajeros.map((passenger) => ({
+    passengers: pasajeros.map((passenger) => ({
       id: String(passenger.solicitudId),
       tripId: id,
       passenger: {
