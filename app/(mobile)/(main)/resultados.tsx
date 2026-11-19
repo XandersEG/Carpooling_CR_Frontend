@@ -93,6 +93,8 @@ export default function ResultadosScreen() {
               key: trip.id,
               card: searchResultCard(trip),
               onPress: () => openTrip(trip.id),
+              originPoint: trip.originPoint,
+              destinationPoint: trip.destinationPoint,
             }))}
           />
         </View>

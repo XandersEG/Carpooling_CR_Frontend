@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { BottomSheet } from '@/components/mobile/BottomSheet';
 import { CalendarPicker } from '@/components/mobile/CalendarPicker';
-import { MapView } from '@/components/mobile/MapView';
+import { RouteMap } from '@/components/mobile/RouteMap';
 import { PlaceAutocomplete } from '@/components/mobile/PlaceAutocomplete';
 import { Screen } from '@/components/mobile/Screen';
 import { ScreenHeader } from '@/components/mobile/ScreenHeader';
@@ -50,7 +50,16 @@ export default function BuscarScreen() {
 
   return (
     <Screen header={<ScreenHeader title="Buscar rutas" />}>
-      <MapView style={StyleSheet.absoluteFill} />
+      {/* real map behind the form; it shows the picked places, kept clear of the card and the button */}
+      <RouteMap
+        style={StyleSheet.absoluteFill}
+        interactive={false}
+        origin={search.originPoint}
+        destination={search.destinationPoint}
+        originLabel={search.origin}
+        destinationLabel={search.destination}
+        insets={{ top: 300, bottom: 100 }}
+      />
 
       {/* La tarjeta de búsqueda queda mitad sobre el fondo blanco y mitad sobre el mapa. */}
       <View style={styles.cardWrapper}>

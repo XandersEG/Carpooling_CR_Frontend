@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { MapView } from '@/components/mobile/MapView';
+import { RouteMap } from '@/components/mobile/RouteMap';
 import { PlaceRow } from '@/components/mobile/PlaceRow';
 import { Screen } from '@/components/mobile/Screen';
 import { ShortcutTile } from '@/components/mobile/ShortcutTile';
@@ -17,7 +17,8 @@ export default function InicioScreen() {
 
   return (
     <Screen>
-      <MapView style={StyleSheet.absoluteFill} />
+      {/* real map as a decorative background (no gestures, the content sits on top) */}
+      <RouteMap style={StyleSheet.absoluteFill} interactive={false} />
 
       <View style={styles.header}>
         <Image
