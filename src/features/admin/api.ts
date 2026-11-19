@@ -383,3 +383,39 @@ export const consultarMontoPromedio = (filtros: {
 
 export const obtenerEstadisticas = (filtros: { institucionId?: number; desde?: string; hasta?: string }) => 
                                     pedir<EstadisticasRespuesta>('/statistics', { consulta: filtros });
+
+/* --------------------------------- listado de viajes ------------------------------- */
+
+export async function consultarListadoViajes(filtros: {
+  desde?: string;
+  hasta?: string;
+  institucionId?: number;
+}): Promise<RawTripData[]> {
+  return pedir('/admin/consultas/viajes-rango-fecha', {
+    consulta: filtros,
+  });
+}
+
+type RawTripData = {
+  id: number;
+  conductorId: number;
+  conductorNombre: string;
+  conductorApellidos: string;
+  vehiculoId: number;
+  placa: string;
+  marca: string;
+  modelo: string;
+  origenNombre: string;
+  origenLat: number;
+  origenLng: number;
+  destinoNombre: string;
+  destinoLat: number;
+  destinoLng: number;
+  rutaPolyline: string;
+  fechaHoraSalida: string;
+  cuposTotales: number;
+  cuposDisponibles: number;
+  costo: number;
+  fechaInicioReal: string | null;
+  fechaFinReal: string | null;
+};
