@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { InstitutionPill, ResultsCard } from '@/components/web/analytics';
+import { ResultsCard } from '@/components/web/analytics';
 import { CountBarChart } from '@/components/web/charts';
-import { ALL_INSTITUTIONS, InstitutionFilter, institutionCode, useInstitutionOptions } from '@/components/web/consultas/shared';
+import { SelectField } from '@/components/web/controls';
+import { ALL_INSTITUTIONS } from '@/components/web/consultas/shared';
 import { FilterCard, FilterItem, FilterSearch, TopStepper } from '@/components/web/filters';
+import { listarInstituciones, mensajesDe } from '@/src/features/admin/api';
+import type { Institucion } from '@/src/features/admin/types';
 import { getNewUsers } from '@/src/services/admin/analyticsService';
 import type { NewUsersQuery } from '@/src/types/analytics';
 import { fonts, palette, webColors } from '@/src/constants/theme';
@@ -28,21 +31,45 @@ function shortDate(value: string): string {
 
 /** Consulta 6 · Usuarios nuevos (340:3224): KPI, barras por mes y tabla con scroll. */
 export function NewUsersView() {
-  const options = useInstitutionOptions();
+  const [institutions, setInstitutions] = useState<Institucion[]>([]);
   const [institution, setInstitution] = useState(ALL_INSTITUTIONS);
   const [search, setSearch] = useState('');
   const [months, setMonths] = useState(DEFAULT_MONTHS);
   const [query, setQuery] = useState<NewUsersQuery | null>(null);
-
-  const code = institutionCode(options, institution);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [institutionError, setInstitutionError] = useState<string | null>(null);
+  const institutionId = institutions.find((item) => item.nombre === institution)?.id;
 
   useEffect(() => {
     let mounted = true;
-    getNewUsers({ institution: code, search, months }).then((result) => mounted && setQuery(result));
+    listarInstituciones()
+      .then((result) => mounted && setInstitutions(result.filter((item) => item.activo)))
+      .catch((cause: unknown) => mounted && setInstitutionError(mensajesDe(cause).join(' ')));
     return () => {
       mounted = false;
     };
-  }, [code, search, months]);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setError(null);
+    getNewUsers({ institutionId, search, months })
+      .then((result) => {
+        if (mounted) setQuery(result);
+      })
+      .catch((cause: unknown) => {
+        if (mounted) {
+          setQuery(null);
+          setError(mensajesDe(cause).join(' '));
+        }
+      })
+      .finally(() => mounted && setLoading(false));
+    return () => {
+      mounted = false;
+    };
+  }, [institutionId, search, months]);
 
   const reset = () => {
     setInstitution(ALL_INSTITUTIONS);
@@ -53,7 +80,15 @@ export function NewUsersView() {
   return (
     <>
       <FilterCard onReset={reset}>
-        <InstitutionFilter value={institution} onChange={setInstitution} options={options} />
+        <FilterItem label="Institución">
+          <SelectField
+            value={institution}
+            options={[ALL_INSTITUTIONS, ...institutions.map((item) => item.nombre)]}
+            onChange={setInstitution}
+            width={287}
+            accessibilityLabel="Institución"
+          />
+        </FilterItem>
         <FilterItem label="Buscar">
           <FilterSearch value={search} onChange={setSearch} />
         </FilterItem>
@@ -61,6 +96,7 @@ export function NewUsersView() {
           <TopStepper value={months} onChange={setMonths} max={MAX_MONTHS} accessibilityLabel="Últimos meses" />
         </FilterItem>
       </FilterCard>
+      {institutionError ? <Text style={styles.error}>{institutionError}</Text> : null}
 
       <ResultsCard
         title={`Usuarios nuevos - últimos ${months} meses`}
@@ -69,9 +105,11 @@ export function NewUsersView() {
         totalLabel="Usuarios totales"
         total={query?.totalUsers}
       >
-        {query === null ? (
+        {loading ? (
           <ActivityIndicator color={palette.lime} style={styles.loading} />
-        ) : (
+        ) : error ? (
+          <Text style={styles.error}>{error}</Text>
+        ) : query === null ? null : (
           <View style={styles.body}>
             <View style={styles.left}>
               <View style={styles.kpi}>
@@ -94,16 +132,18 @@ export function NewUsersView() {
                 <Text style={[styles.headText, styles.colDate]}>Registro</Text>
               </View>
               <ScrollView style={styles.tableScroll}>
-                {query.users.map((user) => (
-                  <View key={user.id} style={styles.tableRow}>
-                    <Text style={[styles.cellText, styles.colUser]}>{user.fullName}</Text>
-                    <View style={[styles.colInst, styles.center]}>
-                      <InstitutionPill code={user.institution} />
+                {query.users.length === 0 ? (
+                  <Text style={styles.empty}>No se encontraron usuarios en este periodo.</Text>
+                ) : (
+                  query.users.map((user) => (
+                    <View key={user.id} style={styles.tableRow}>
+                      <Text style={[styles.cellText, styles.colUser]}>{user.fullName}</Text>
+                      <Text style={[styles.cellText, styles.colInst]}>{user.institution}</Text>
+                      <Text style={[styles.cellText, styles.colRole, styles.centerText]}>{capitalize(user.role)}</Text>
+                      <Text style={[styles.cellText, styles.colDate, styles.centerText]}>{shortDate(user.registeredAt)}</Text>
                     </View>
-                    <Text style={[styles.cellText, styles.colRole, styles.centerText]}>{capitalize(user.role)}</Text>
-                    <Text style={[styles.cellText, styles.colDate, styles.centerText]}>{shortDate(user.registeredAt)}</Text>
-                  </View>
-                ))}
+                  ))
+                )}
               </ScrollView>
             </View>
           </View>
@@ -116,6 +156,20 @@ export function NewUsersView() {
 const styles = StyleSheet.create({
   loading: {
     marginTop: 40,
+  },
+  error: {
+    color: palette.terracotta,
+    fontFamily: fonts.cairoMedium,
+    fontSize: 15,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  empty: {
+    color: palette.grey,
+    fontFamily: fonts.cairoMedium,
+    fontSize: 15,
+    padding: 18,
+    textAlign: 'center',
   },
   body: {
     flexDirection: 'row',

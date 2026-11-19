@@ -66,7 +66,7 @@ export type AverageAmountQuery = {
 export type NewUserEntry = {
   id: Id;
   fullName: string;
-  institution: InstitutionCode;
+  institution: string;
   role: Role;
   registeredAt: IsoDate;
 };

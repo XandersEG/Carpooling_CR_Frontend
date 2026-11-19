@@ -10,6 +10,7 @@ import type {
   UsuarioResumen,
   ValorCatalogo,
 } from './types';
+import type { NewUserEntry, NewUsersQuery } from '@/src/types/analytics';
 
 import type { EstadisticasRespuesta } from '@/src/types/analytics';
 
@@ -194,6 +195,24 @@ export const listarUsuarios = (filtros: {
   pedir<{ datos: UsuarioResumen[]; total: number }>('/admin/users', {
     consulta: filtros,
   });
+
+type RespuestaUsuariosNuevos = Omit<NewUsersQuery, 'users'> & {
+  users: Array<Omit<NewUserEntry, 'id'> & { id: number }>;
+};
+
+export async function consultarUsuariosNuevos(filtros: {
+  meses: number;
+  institucionId?: number;
+  buscar?: string;
+}): Promise<NewUsersQuery> {
+  const respuesta = await pedir<RespuestaUsuariosNuevos>('/admin/consultas/usuarios-nuevos', {
+    consulta: filtros,
+  });
+  return {
+    ...respuesta,
+    users: respuesta.users.map((user) => ({ ...user, id: String(user.id) })),
+  };
+}
 
 export const obtenerUsuario = (id: number) => pedir<UsuarioDetalle>(`/admin/users/${id}`);
 
