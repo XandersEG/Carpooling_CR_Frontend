@@ -7,7 +7,7 @@ import { USE_MOCK_DATA } from './config';
 import { delay } from './mock/utils';
 import { setSessionToken } from './session';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
 
 /** Datos del formulario "Registro" (app móvil). */
 export type RegisterInput = {
@@ -18,14 +18,9 @@ export type RegisterInput = {
   roles: Role[];
   birthDate: IsoDate;
   password: string;
+  acceptedTerms: boolean;
 };
 
-function requireApiUrl(): string {
-  if (!API_URL) {
-    throw new Error('Falta configurar EXPO_PUBLIC_API_URL en el archivo .env.');
-  }
-  return API_URL;
-}
 
 /**
  * Inicia sesión contra el Backend y guarda el token de la sesión.
@@ -51,21 +46,18 @@ export async function login(credentials: LoginCredentials): Promise<LoginRespons
  * Provisional: la ruta `/auth/register` y la respuesta deben coordinarse con
  * el equipo de Backend.
  */
-export async function register(input: RegisterInput): Promise<LoginResponse> {
-  if (USE_MOCK_DATA) {
-    await delay(600);
-    return { token: 'mock-token' };
-  }
+type RegisterResponse = {
+  message: string;
+  user: {
+    id: number;
+    email: string;
+  };
+  emailVerified: boolean;
+};
 
-  const response = await fetch(`${requireApiUrl()}/auth/register`, {
+export async function register(input: RegisterInput): Promise<RegisterResponse> {
+  return apiRequest<RegisterResponse>('/auth/register', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
+    body: input,
   });
-
-  if (!response.ok) {
-    throw new Error('No se pudo completar el registro.');
-  }
-
-  return (await response.json()) as LoginResponse;
 }
