@@ -55,18 +55,20 @@ export default function VehiclePhotosScreen() {
   };
 
   const save = async () => {
-    setSaving(true);
-    try {
-      if (vehicle) {
-        const { brand, model, plate, color, capacity, year } = vehicle;
-        await updateVehicle(vehicle.id, { brand, model, plate, color, capacity, year, photoUrls: photos });
-      }
-      setPhotoDraft(id, photos);
-      goBack();
-    } finally {
-      setSaving(false);
+  setSaving(true);
+  try {
+    let saved = photos;
+    if (vehicle) {
+      const { brand, model, plate, color, capacity, year } = vehicle;
+      const updated = await updateVehicle(vehicle.id, { brand, model, plate, color, capacity, year, photoUrls: photos });
+      saved = updated.photoUrls; // ya son URLs remotas
     }
-  };
+    setPhotoDraft(id, saved);
+    goBack();
+  } finally {
+    setSaving(false);
+  }
+};
 
   const preview = vehicle ? getVehiclePhoto({ id: vehicle.id, photoUrls: photos }) : getVehiclePhoto({ id, photoUrls: photos });
 

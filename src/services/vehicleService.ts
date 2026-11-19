@@ -15,6 +15,8 @@ import { USE_MOCK_DATA } from './config';
 import { db } from './mock/db';
 import { createId, notFound, respond } from './mock/utils';
 
+import { uploadVehiclePhotos } from './vehiclePhotoStorage';
+
 /** Vehicle as returned by `/driver/vehicles`. */
 type VehicleResponse = {
   id: number;
@@ -24,6 +26,7 @@ type VehicleResponse = {
   color: string;
   capacidadPasajeros: number;
   activo: boolean;
+  fotos?: string[];
 };
 
 /** Body accepted by POST and PATCH `/driver/vehicles`. */
@@ -33,6 +36,7 @@ type VehicleRequest = {
   modelo: string;
   color: string;
   capacidadPasajeros: number;
+  fotos?: string[];
 };
 
 const BASE_PATH = '/driver/vehicles';
@@ -45,18 +49,20 @@ function toVehicle(response: VehicleResponse): Vehicle {
     plate: response.placa,
     color: response.color,
     capacity: response.capacidadPasajeros,
-    photoUrls: [],
+    photoUrls: response.fotos ?? [],
     active: response.activo,
   };
 }
 
-function toRequest(input: VehicleInput): VehicleRequest {
+// ahora es async porque sube las fotos
+async function toRequest(input: VehicleInput): Promise<VehicleRequest> {
   return {
     placa: input.plate,
     marca: input.brand,
     modelo: input.model,
     color: input.color,
     capacidadPasajeros: input.capacity,
+    fotos: input.photoUrls ? await uploadVehiclePhotos(input.photoUrls) : undefined,
   };
 }
 
