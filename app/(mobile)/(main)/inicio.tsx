@@ -1,23 +1,65 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { MapView } from '@/components/mobile/MapView';
+import { LocationPickerMap } from '@/components/mobile/driver/LocationPickerMap';
+import { LOOKING_UP_ADDRESS, useAddressLookup } from '@/components/mobile/useAddressLookup';
+import { Button } from '@/components/shared/Button';
+import type { GeoPoint } from '@/src/types/common';
 import { PlaceRow } from '@/components/mobile/PlaceRow';
 import { Screen } from '@/components/mobile/Screen';
 import { ShortcutTile } from '@/components/mobile/ShortcutTile';
 import { IconBuscar, IconCar, IconList, IconPlus, IconReloj } from '@/components/mobile/icons';
 import { useServiceData } from '@/components/mobile/passenger/useServiceData';
 import { colors, palette, radius, shadows, spacing, typography } from '@/src/constants/theme';
-import { getProfile, getSavedPlaces } from '@/src/services/profileService';
+import { getGreetingName, getSavedPlaces } from '@/src/services/profileService';
 
 /** "Menu Home" (Figma 2467:2462). */
 export default function InicioScreen() {
-  const profile = useServiceData(getProfile, []);
+  // real name of the logged-in user (GET /auth/me)
+  const greetingName = useServiceData(getGreetingName, []);
   const places = useServiceData(getSavedPlaces, []);
+  // destination marked on the map ("¿A dónde vas?" with a tap instead of typing)
+  const [destination, setDestination] = useState<{ name: string; point: GeoPoint } | null>(null);
+  // top of the visible map strip, so the zoom buttons sit inside it
+  const [mapTop, setMapTop] = useState(0);
+  // height of the bottom panel, so the "my location" button sits just above it
+  const [sheetHeight, setSheetHeight] = useState(0);
+  const { lookup } = useAddressLookup();
+
+  function pickDestination(point: GeoPoint) {
+    lookup('destino', point, (name) => setDestination({ name, point }));
+  }
+
+  function searchToDestination() {
+    if (!destination) return;
+    router.push({
+      pathname: '/buscar',
+      params: {
+        destination: destination.name,
+        destinationLat: String(destination.point.lat),
+        destinationLng: String(destination.point.lng),
+      },
+    });
+  }
 
   return (
     <Screen>
-      <MapView style={StyleSheet.absoluteFill} />
+      {/* real map behind the content; the strip between the search bar and the panel can be
+          zoomed and tapped to mark a destination */}
+      <LocationPickerMap
+        style={StyleSheet.absoluteFill}
+        origin={null}
+        destination={destination?.point ?? null}
+        target="destino"
+        onPick={(_, point) => pickDestination(point)}
+        destinationLabel={destination?.name}
+        topInset={mapTop}
+        // the panel, plus the "Buscar viajes a…" button when a destination is marked
+        bottomInset={sheetHeight + (destination ? 70 : 0)}
+        followPoints={false}
+        pinOnLocate={false}
+      />
 
       <View style={styles.header}>
         <Image
@@ -27,7 +69,7 @@ export default function InicioScreen() {
           accessibilityLabel="Tuanis Carpooling"
         />
         <Text accessibilityRole="header" style={styles.greeting} numberOfLines={1}>
-          {profile.data ? `Hola, ${profile.data.displayName}` : 'Hola'}
+          {greetingName.data ? `Hola, ${greetingName.data}` : 'Hola'}
         </Text>
         <Text style={styles.subtitle}>¿A dónde quieres ir hoy?</Text>
       </View>
@@ -52,9 +94,25 @@ export default function InicioScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.mapGap} />
+      {/* box-none: taps on the empty strip reach the map underneath */}
+      <View
+        style={styles.mapGap}
+        pointerEvents="box-none"
+        onLayout={(event) => setMapTop(event.nativeEvent.layout.y)}
+      >
+        {destination ? (
+          <Button
+            title={
+              destination.name === LOOKING_UP_ADDRESS ? LOOKING_UP_ADDRESS : `Buscar viajes a ${destination.name}`
+            }
+            onPress={searchToDestination}
+            disabled={destination.name === LOOKING_UP_ADDRESS}
+            fullWidth
+          />
+        ) : null}
+      </View>
 
-      <View style={styles.sheet}>
+      <View style={styles.sheet} onLayout={(event) => setSheetHeight(event.nativeEvent.layout.height)}>
         <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false} bounces={false}>
           <View style={styles.shortcuts}>
             <ShortcutTile label="Buscar viaje" Icon={IconCar} onPress={() => router.push('/buscar')} />
@@ -153,6 +211,9 @@ const styles = StyleSheet.create({
   mapGap: {
     flex: 1,
     minHeight: 120,
+    justifyContent: 'flex-end',
+    paddingHorizontal: spacing.screen,
+    paddingBottom: spacing.m,
   },
   sheet: {
     flexShrink: 1,

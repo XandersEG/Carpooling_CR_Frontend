@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BottomSheet } from '@/components/mobile/BottomSheet';
 import { CalendarPicker } from '@/components/mobile/CalendarPicker';
@@ -16,6 +16,7 @@ import {
 } from '@/components/mobile/driver/PublishParts';
 import { LocationPickerMap, type PickTarget } from '@/components/mobile/driver/LocationPickerMap';
 import { VehicleCard } from '@/components/mobile/driver/VehicleCard';
+import { NoticeBox } from '@/components/mobile/Detail';
 import { Stepper } from '@/components/mobile/Form';
 import { IconPlus } from '@/components/mobile/icons';
 import { PlaceAutocomplete } from '@/components/mobile/PlaceAutocomplete';
@@ -39,6 +40,8 @@ const ROUTE_CARD_INSET = 200;
 
 /** Hora inicial del diseño ("6:30 a. m."). */
 const DEFAULT_TIME = '06:30';
+/** Shown in a field while the address of its pin is being looked up. */
+const LOOKING_UP_ADDRESS = 'Buscando dirección…';
 
 /**
  * Asistente "Publicar Viaje" (Movil Punto 3): Vehículo (2390:1976), Ruta
@@ -107,32 +110,51 @@ export default function PublishTripScreen() {
   // "Si el monto es 0 se publicará como gratis": se usa el método Gratuito del catálogo.
   const effectiveMethod = amount === 0 ? freeMethod : (methods.find((item) => item.id === methodId) ?? null);
 
-  // after marking the origin, the next tap marks the destination (if it is still missing)
+  // latest address lookup per field: a slower, older answer must not overwrite a newer pin
+  const lookupId = useRef({ origen: 0, destino: 0 });
+
+  // Uber-style: the pin and the text always match. A tapped or dragged pin rewrites its
+  // field with the address; after marking the origin, the next tap marks the destination.
   const pickPoint = (target: PickTarget, point: GeoPoint) => {
+    // close the keyboard and the suggestion list so the map gets the attention
+    Keyboard.dismiss();
+    const setName = target === 'origen' ? setOrigin : setDestination;
     if (target === 'origen') {
       setOriginPoint(point);
       if (!destinationPoint) setMapTarget('destino');
     } else {
       setDestinationPoint(point);
     }
-    // a point tapped on the map gets a name if its field is still empty
-    const name = target === 'origen' ? origin : destination;
-    if (!name.trim()) {
-      describePoint(point)
-        .then((place) => {
-          if (!place) return;
-          const setName = target === 'origen' ? setOrigin : setDestination;
-          // only fill it if the driver did not type something meanwhile
-          setName((current) => (current.trim() ? current : place.name));
-        })
-        .catch(() => {
-          // without a name the driver can still type it
-        });
-    }
+
+    const id = ++lookupId.current[target];
+    setName(LOOKING_UP_ADDRESS);
+    describePoint(point)
+      .catch(() => null)
+      .then((place) => {
+        if (lookupId.current[target] !== id) return;
+        // without an address the point is still valid; the driver can rename it
+        setName(place?.name ?? 'Punto en el mapa');
+      });
+  };
+
+  // the driver's real-time location is the default origin (only while the origin is empty)
+  const applyMyLocation = (point: GeoPoint) => {
+    if (origin.trim() || originPoint) return;
+    setOriginPoint(point);
+    if (!destinationPoint) setMapTarget('destino');
+    const id = ++lookupId.current.origen;
+    setOrigin(LOOKING_UP_ADDRESS);
+    describePoint(point)
+      .catch(() => null)
+      .then((place) => {
+        if (lookupId.current.origen === id) setOrigin(place?.name ?? 'Punto en el mapa');
+      });
   };
 
   // a picked suggestion sets the field's name and its point on the map
   const selectPlace = (target: PickTarget, place: PlaceSuggestion) => {
+    // a pending address lookup for this field no longer applies
+    lookupId.current[target]++;
     if (target === 'origen') {
       setOrigin(place.name);
       setOriginPoint(place.point);
@@ -160,6 +182,9 @@ export default function PublishTripScreen() {
   const confirmTrip = async () => {
     if (!activeVehicle) return setError('Elige el vehículo que utilizas para realizar viajes');
     if (!origin.trim() || !destination.trim()) return setError('Indica el punto de partida y el destino del viaje');
+    if (origin === LOOKING_UP_ADDRESS || destination === LOOKING_UP_ADDRESS) {
+      return setError('Espera a que se cargue la dirección del punto marcado');
+    }
     if (!originPoint || !destinationPoint) return setError('Marca el origen y el destino en el mapa');
     if (!effectiveMethod) return setError('Define cómo se realizará el pago');
     setError(null);
@@ -187,6 +212,22 @@ export default function PublishTripScreen() {
 
   const dateLabel = formatRelativeDay(buildDepartureAt(date, time));
   const timeLabel = formatSlot(time);
+
+  // only drivers publish: a user becomes a driver when registering their first vehicle
+  // (the Backend also rejects trips from users without one)
+  if (vehicles !== null && vehicles.length === 0) {
+    return (
+      <Screen
+        scroll
+        header={<ScreenHeader title="Publicar Viaje" onBack={() => router.navigate('/inicio')} />}
+        contentStyle={styles.content}
+      >
+        <SectionTitle title="Aún no eres conductor" subtitle="Para publicar viajes primero registra un vehículo" />
+        <NoticeBox text="Cuando registres tu vehículo podrás ofrecer viajes y recibir solicitudes de pasajeros." />
+        <Button title="Registrar vehículo" onPress={() => router.push('/vehiculos/nuevo')} fullWidth />
+      </Screen>
+    );
+  }
 
   const header = (
     <View style={styles.headerBlock}>
@@ -251,9 +292,12 @@ export default function PublishTripScreen() {
             destination={destinationPoint}
             target={mapTarget}
             onPick={pickPoint}
+            onLocated={applyMyLocation}
             originLabel={origin.trim()}
             destinationLabel={destination.trim()}
             topInset={ROUTE_CARD_INSET}
+            // the hint at the bottom of the map
+            bottomInset={64}
             style={styles.routeMap}
           />
           <View style={styles.routeTitle}>
