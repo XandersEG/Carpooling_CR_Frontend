@@ -11,8 +11,7 @@ import {
 } from '@/components/web/analytics';
 import { ALL_INSTITUTIONS, InstitutionFilter, institutionCode, useInstitutionOptions } from '@/components/web/consultas/shared';
 import { DateField, FilterCard, FilterItem, FilterSearch, TopStepper } from '@/components/web/filters';
-import { listarInstituciones, mensajesDe } from '@/src/features/admin/api';
-import type { Institucion } from '@/src/features/admin/types';
+import { mensajesDe } from '@/src/features/admin/api';
 import { getRanking, type RankingKind } from '@/src/services/admin/analyticsService';
 import type { RankingQuery } from '@/src/types/analytics';
 import type { IsoDate } from '@/src/types/common';
@@ -64,7 +63,7 @@ export const rankingConfigs: Record<RankingKind, RankingConfig> = {
     filter: 'search',
     stepperSuffix: 'usuarios',
     title: (top) => `Top ${top} usuarios más activos`,
-    subtitle: () => 'Usuarios con más viajes registrados, como conductor o pasajero.',
+    subtitle: () => 'Usuarios con más viajes finalizados: como conductor o pasajero.',
     totalLabel: 'Usuarios con viajes',
     // El diseño repite "CONDUCTOR" en esta tabla; se corrige a "USUARIO".
     nameHeader: 'USUARIO',
@@ -74,11 +73,10 @@ export const rankingConfigs: Record<RankingKind, RankingConfig> = {
 /** Consultas 1–3 (228:142, 340:3557, 340:3858): tabla "Top N" con barra en la celda. */
 export function RankingQueryView({ kind }: { kind: RankingKind }) {
   const config = rankingConfigs[kind];
-  const [institutions, setInstitutions] = useState<Institucion[]>([]);
   const [institutionError, setInstitutionError] = useState<string | null>(null);
   const [institution, setInstitution] = useState(ALL_INSTITUTIONS);
   const [search, setSearch] = useState('');
-  // El rango se consulta para puntos concurrentes; los demás rankings usan fixtures.
+  // El rango se consulta para puntos concurrentes; los demás rankings filtran por nombre.
   const [from, setFrom] = useState<IsoDate | null>(config.defaultFrom ?? null);
   const [to, setTo] = useState<IsoDate | null>(
     kind === 'puntos' ? fechaActual() : config.defaultTo ?? null,
@@ -87,35 +85,11 @@ export function RankingQueryView({ kind }: { kind: RankingKind }) {
   const [query, setQuery] = useState<RankingQuery | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const options = useInstitutionOptions(
-    kind === 'conductores' ? 'admin' : 'mock',
-    setInstitutionError,
-  );
+  const options = useInstitutionOptions('admin', setInstitutionError, kind === 'puntos');
   const selectedInstitution = options.find((option) => option.label === institution);
 
-  useEffect(() => {
-    if (kind !== 'puntos') return;
-
-    let mounted = true;
-    listarInstituciones()
-      .then((result) => mounted && setInstitutions(result.filter((item) => item.activo)))
-      .catch((cause: unknown) => mounted && setInstitutionError(mensajesDe(cause).join(' ')));
-    return () => {
-      mounted = false;
-    };
-  }, [kind]);
-
-  const filterOptions =
-    kind === 'puntos'
-      ? [
-          { label: ALL_INSTITUTIONS, code: null },
-          ...institutions.map((item) => ({ label: item.nombre, code: null })),
-        ]
-      : options;
-  const institutionId =
-    kind === 'puntos'
-      ? institutions.find((item) => item.nombre === institution)?.id
-      : selectedInstitution?.id;
+  const filterOptions = options;
+  const institutionId = selectedInstitution?.id;
   const code = kind === 'puntos' ? null : institutionCode(options, institution);
 
   useEffect(() => {
