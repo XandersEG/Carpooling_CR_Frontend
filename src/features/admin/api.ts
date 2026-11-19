@@ -383,3 +383,13 @@ export const consultarMontoPromedio = (filtros: {
 
 export const obtenerEstadisticas = (filtros: { institucionId?: number; desde?: string; hasta?: string }) => 
                                     pedir<EstadisticasRespuesta>('/statistics', { consulta: filtros });
+
+export const consultarViajes = (filtros: {
+  institucionId?: number;
+  desde?: string;
+  hasta?: string;
+  buscar?: string;
+}) =>
+  pedir<TripListEntry[]>('/admin/consultas/viajes', {
+    consulta: filtros,
+  });

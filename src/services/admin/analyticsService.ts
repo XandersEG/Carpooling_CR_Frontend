@@ -23,6 +23,7 @@ import {
   consultarTopConductores,
   consultarUsuariosActivos,
   consultarUsuariosNuevos,
+  consultarViajes
 } from '@/src/features/admin/api';
 
 import * as fixtures from '../mock/fixtures/analytics';
@@ -109,14 +110,23 @@ export async function getRanking(
 }
 
 export async function listTrips(filters: TableFilters & DateRange): Promise<TripListEntry[]> {
-  const trips = fixtures.tripList.filter((trip) => {
-    if (!matches(trip.driverName, trip.institution, filters)) return false;
-    const day = toIsoDate(trip.departureAt);
-    if (filters.from && day < filters.from) return false;
-    if (filters.to && day > filters.to) return false;
-    return true;
+  if (USE_MOCK_DATA) {
+    const trips = fixtures.tripList.filter((trip) => {
+      if (!matches(trip.driverName, trip.institution, filters)) return false;
+      const day = toIsoDate(trip.departureAt);
+      if (filters.from && day < filters.from) return false;
+      if (filters.to && day > filters.to) return false;
+      return true;
+    });
+    return respond(trips);
+  }
+
+  return await consultarViajes({
+    institucionId: filters.institutionId,
+    desde: filters.from ?? undefined,
+    hasta: filters.to ?? undefined,
+    buscar: filters.search?.trim() || undefined,
   });
-  return respond(trips);
 }
 
 export async function getAverageAmount(filters: TableFilters): Promise<AverageAmountQuery> {
