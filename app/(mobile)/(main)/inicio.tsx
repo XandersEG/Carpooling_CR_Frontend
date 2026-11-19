@@ -1,7 +1,11 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { RouteMap } from '@/components/mobile/RouteMap';
+import { LocationPickerMap } from '@/components/mobile/driver/LocationPickerMap';
+import { LOOKING_UP_ADDRESS, useAddressLookup } from '@/components/mobile/useAddressLookup';
+import { Button } from '@/components/shared/Button';
+import type { GeoPoint } from '@/src/types/common';
 import { PlaceRow } from '@/components/mobile/PlaceRow';
 import { Screen } from '@/components/mobile/Screen';
 import { ShortcutTile } from '@/components/mobile/ShortcutTile';
@@ -14,11 +18,42 @@ import { getProfile, getSavedPlaces } from '@/src/services/profileService';
 export default function InicioScreen() {
   const profile = useServiceData(getProfile, []);
   const places = useServiceData(getSavedPlaces, []);
+  // destination marked on the map ("¿A dónde vas?" with a tap instead of typing)
+  const [destination, setDestination] = useState<{ name: string; point: GeoPoint } | null>(null);
+  // top of the visible map strip, so the zoom buttons sit inside it
+  const [mapTop, setMapTop] = useState(0);
+  const { lookup } = useAddressLookup();
+
+  function pickDestination(point: GeoPoint) {
+    lookup('destino', point, (name) => setDestination({ name, point }));
+  }
+
+  function searchToDestination() {
+    if (!destination) return;
+    router.push({
+      pathname: '/buscar',
+      params: {
+        destination: destination.name,
+        destinationLat: String(destination.point.lat),
+        destinationLng: String(destination.point.lng),
+      },
+    });
+  }
 
   return (
     <Screen>
-      {/* real map as a decorative background (no gestures, the content sits on top) */}
-      <RouteMap style={StyleSheet.absoluteFill} interactive={false} />
+      {/* real map behind the content; the strip between the search bar and the panel can be
+          zoomed and tapped to mark a destination */}
+      <LocationPickerMap
+        style={StyleSheet.absoluteFill}
+        origin={null}
+        destination={destination?.point ?? null}
+        target="destino"
+        onPick={(_, point) => pickDestination(point)}
+        destinationLabel={destination?.name}
+        topInset={mapTop}
+        followPoints={false}
+      />
 
       <View style={styles.header}>
         <Image
@@ -53,7 +88,23 @@ export default function InicioScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.mapGap} />
+      {/* box-none: taps on the empty strip reach the map underneath */}
+      <View
+        style={styles.mapGap}
+        pointerEvents="box-none"
+        onLayout={(event) => setMapTop(event.nativeEvent.layout.y)}
+      >
+        {destination ? (
+          <Button
+            title={
+              destination.name === LOOKING_UP_ADDRESS ? LOOKING_UP_ADDRESS : `Buscar viajes a ${destination.name}`
+            }
+            onPress={searchToDestination}
+            disabled={destination.name === LOOKING_UP_ADDRESS}
+            fullWidth
+          />
+        ) : null}
+      </View>
 
       <View style={styles.sheet}>
         <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false} bounces={false}>
@@ -154,6 +205,9 @@ const styles = StyleSheet.create({
   mapGap: {
     flex: 1,
     minHeight: 120,
+    justifyContent: 'flex-end',
+    paddingHorizontal: spacing.screen,
+    paddingBottom: spacing.m,
   },
   sheet: {
     flexShrink: 1,

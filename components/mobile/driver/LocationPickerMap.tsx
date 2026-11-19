@@ -21,6 +21,8 @@ export type LocationPickerMapProps = {
   destinationLabel?: string;
   /** Map height covered by content on top (e.g. a fields card), kept clear when fitting the points. */
   topInset?: number;
+  /** false keeps the camera still when a point changes (the tapped point is already in view). */
+  followPoints?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -58,6 +60,7 @@ export function LocationPickerMap({
   originLabel,
   destinationLabel,
   topInset = 0,
+  followPoints = true,
   style,
 }: LocationPickerMapProps) {
   const mapRef = useRef<MapView>(null);
@@ -68,7 +71,7 @@ export function LocationPickerMap({
   // keep the picked points in view (e.g. after choosing a suggestion far from the current view)
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !followPoints) return;
     if (origin && destination) {
       map.fitToCoordinates([toLatLng(origin), toLatLng(destination)], {
         edgePadding: { top: 60 + topInset, right: 60, bottom: 60, left: 60 },
@@ -78,7 +81,7 @@ export function LocationPickerMap({
       const point = (origin ?? destination) as GeoPoint;
       map.animateToRegion({ ...toLatLng(point), latitudeDelta: 0.05, longitudeDelta: 0.05 });
     }
-  }, [ready, origin, destination, topInset]);
+  }, [ready, followPoints, origin, destination, topInset]);
 
   const handlePress = (event: MapPressEvent) => {
     onPick(target, toGeoPoint(event.nativeEvent.coordinate));
@@ -134,7 +137,8 @@ export function LocationPickerMap({
 }
 
 const styles = StyleSheet.create({
+  // fills the space the screen gives it (Publicar, Buscar and Inicio use the whole screen)
   map: {
-    height: 318,
+    flex: 1,
   },
 });

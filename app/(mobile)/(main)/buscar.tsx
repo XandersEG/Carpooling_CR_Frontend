@@ -1,10 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Keyboard, StyleSheet, View } from 'react-native';
 
 import { BottomSheet } from '@/components/mobile/BottomSheet';
 import { CalendarPicker } from '@/components/mobile/CalendarPicker';
-import { RouteMap } from '@/components/mobile/RouteMap';
+import { LocationPickerMap, type PickTarget } from '@/components/mobile/driver/LocationPickerMap';
+import { LOOKING_UP_ADDRESS, useAddressLookup } from '@/components/mobile/useAddressLookup';
 import { PlaceAutocomplete } from '@/components/mobile/PlaceAutocomplete';
 import { Screen } from '@/components/mobile/Screen';
 import { ScreenHeader } from '@/components/mobile/ScreenHeader';
@@ -20,6 +21,7 @@ import {
 } from '@/components/mobile/passenger/search';
 import { Button } from '@/components/shared/Button';
 import { colors, radius, spacing } from '@/src/constants/theme';
+import type { GeoPoint } from '@/src/types/common';
 import type { TripSearchParams } from '@/src/types/trip';
 import { now } from '@/src/utils/clock';
 import { toIsoDate } from '@/src/utils/format';
@@ -35,9 +37,25 @@ export default function BuscarScreen() {
   const params = useLocalSearchParams<SearchRouteParams>();
   const [search, setSearch] = useState<TripSearchParams>(() => readSearchParams(params));
   const [panel, setPanel] = useState<Panel>(null);
+  // field that the next tap on the map sets
+  const [mapTarget, setMapTarget] = useState<PickTarget>('origen');
+  const { lookup, cancel } = useAddressLookup();
 
   function update(patch: Partial<TripSearchParams>) {
     setSearch((current) => ({ ...current, ...patch }));
+  }
+
+  // a tapped or dragged pin moves its point and rewrites its field with the address
+  function pickPoint(target: PickTarget, point: GeoPoint) {
+    Keyboard.dismiss();
+    if (target === 'origen') {
+      update({ originPoint: point });
+      if (!search.destinationPoint) setMapTarget('destino');
+      lookup('origen', point, (origin) => update({ origin }));
+    } else {
+      update({ destinationPoint: point });
+      lookup('destino', point, (destination) => update({ destination }));
+    }
   }
 
   function handleSearch() {
@@ -46,19 +64,24 @@ export default function BuscarScreen() {
     router.push({ pathname: '/resultados', params: toRouteParams(next) });
   }
 
-  const canSearch = search.origin.trim().length > 0 && search.destination.trim().length > 0;
+  const canSearch =
+    search.origin.trim().length > 0 &&
+    search.destination.trim().length > 0 &&
+    search.origin !== LOOKING_UP_ADDRESS &&
+    search.destination !== LOOKING_UP_ADDRESS;
 
   return (
     <Screen header={<ScreenHeader title="Buscar rutas" />}>
-      {/* real map behind the form; it shows the picked places, kept clear of the card and the button */}
-      <RouteMap
+      {/* real map behind the form: tap it (or drag the pins) to mark origin and destination */}
+      <LocationPickerMap
         style={StyleSheet.absoluteFill}
-        interactive={false}
-        origin={search.originPoint}
-        destination={search.destinationPoint}
+        origin={search.originPoint ?? null}
+        destination={search.destinationPoint ?? null}
+        target={mapTarget}
+        onPick={pickPoint}
         originLabel={search.origin}
         destinationLabel={search.destination}
-        insets={{ top: 300, bottom: 100 }}
+        topInset={300}
       />
 
       {/* La tarjeta de búsqueda queda mitad sobre el fondo blanco y mitad sobre el mapa. */}
@@ -72,16 +95,27 @@ export default function BuscarScreen() {
             placeholder="Origen"
             // typing something else drops the point of the previously picked place
             onChangeText={(origin) => update({ origin, originPoint: undefined })}
-            onSelect={(place) => update({ origin: place.name, originPoint: place.point })}
-            inputProps={{ returnKeyType: 'next' }}
+            onSelect={(place) => {
+              cancel('origen');
+              update({ origin: place.name, originPoint: place.point });
+              if (!search.destinationPoint) setMapTarget('destino');
+            }}
+            inputProps={{ returnKeyType: 'next', onFocus: () => setMapTarget('origen') }}
           />
           <PlaceAutocomplete
             kind="destino"
             value={search.destination}
             placeholder="Destino"
             onChangeText={(destination) => update({ destination, destinationPoint: undefined })}
-            onSelect={(place) => update({ destination: place.name, destinationPoint: place.point })}
-            inputProps={{ returnKeyType: 'search', onSubmitEditing: canSearch ? handleSearch : undefined }}
+            onSelect={(place) => {
+              cancel('destino');
+              update({ destination: place.name, destinationPoint: place.point });
+            }}
+            inputProps={{
+              returnKeyType: 'search',
+              onSubmitEditing: canSearch ? handleSearch : undefined,
+              onFocus: () => setMapTarget('destino'),
+            }}
           />
           <SearchField
             kind="fecha"
