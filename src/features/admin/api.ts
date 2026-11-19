@@ -170,12 +170,15 @@ export const borrarValor = (catalogo: string, valorId: number) =>
 
 export const listarInstituciones = () => pedir<Institucion[]>('/admin/institutions');
 
-export const crearInstitucion = (datos: { nombre: string; dominioCorreo: string }) =>
-  pedir<Institucion>('/admin/institutions', { metodo: 'POST', cuerpo: datos });
+export const crearInstitucion = (datos: {
+  nombre: string;
+  acronimo: string;
+  dominioCorreo: string;
+}) => pedir<Institucion>('/admin/institutions', { metodo: 'POST', cuerpo: datos });
 
 export const actualizarInstitucion = (
   id: number,
-  cambios: { nombre?: string; dominioCorreo?: string; activo?: boolean },
+  cambios: { nombre?: string; acronimo?: string; dominioCorreo?: string; activo?: boolean },
 ) =>
   pedir<Institucion>(`/admin/institutions/${id}`, {
     metodo: 'PATCH',
