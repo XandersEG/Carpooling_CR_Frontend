@@ -257,6 +257,30 @@ export const restablecerContrasena = (token: string, password: string) =>
 // avisa al servidor para que el token deje de servir
 export const cerrarSesionEnServidor = () => pedir<void>('/admin/auth/logout', { metodo: 'POST' });
 
+/* ------------------------ consulta monto promedio ------------------------ */
+
+// Contrato de GET /api/admin/consultas/monto-promedio del backend.
+// Los importes son null cuando no hay viajes con cobro en el período.
+export type RespuestaMontoPromedio = {
+  viajesEnPeriodo: number;
+  viajesConCobro: number;
+  viajesSinCobro: number;
+  montoPromedio: number | null;
+  montoMinimo: number | null;
+  montoMaximo: number | null;
+  promedioPorInstitucion: {
+    institucionId: number;
+    institucion: string;
+    montoPromedio: number;
+    viajesConCobro: number;
+  }[];
+};
+
+export const consultarMontoPromedio = (filtros: {
+  institucionId?: number;
+  desde?: string;
+  hasta?: string;
+}) => pedir<RespuestaMontoPromedio>('/admin/consultas/monto-promedio', { consulta: filtros });
 
 
 /* --------------------------------- estadisticas ------------------------------- */

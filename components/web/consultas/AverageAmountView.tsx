@@ -3,47 +3,107 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { ResultsCard } from '@/components/web/analytics';
 import { ValueBarChart } from '@/components/web/charts';
-import { ALL_INSTITUTIONS, InstitutionFilter, institutionCode, useInstitutionOptions } from '@/components/web/consultas/shared';
+import { ALL_INSTITUTIONS, InstitutionFilter } from '@/components/web/consultas/shared';
 import { DateField, FilterCard, FilterItem } from '@/components/web/filters';
 import { IconInfo } from '@/components/web/icons';
-import { getAverageAmount } from '@/src/services/admin/analyticsService';
-import type { AverageAmountQuery } from '@/src/types/analytics';
+import { consultarMontoPromedio, listarInstituciones, mensajesDe, type RespuestaMontoPromedio } from '@/src/features/admin/api';
+import type { InstitutionFilterOption } from '@/src/types/analytics';
 import type { IsoDate } from '@/src/types/common';
 import { fonts, palette, webColors } from '@/src/constants/theme';
-import { formatColones } from '@/src/utils/format';
+import { formatColones, toIsoDate  } from '@/src/utils/format';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
-// Rango del frame 340:3079. Los datos de ejemplo no permiten filtrar por fechas.
-const DEFAULT_FROM: IsoDate = '2026-01-01';
-const DEFAULT_TO: IsoDate = '2026-10-15';
-/** Eje del gráfico "Promedio por institución": ₡0 a ₡1400 cada ₡350. */
-const AXIS_MAX = 1400;
-const AXIS_STEP = 350;
+/** Ajustar el eje a montos reales; el diseño original asumía un máximo fijo de ₡1400. */
+function chartScale(values: number[]): { max: number; step: number } {
+  const highest = Math.max(0, ...values);
+  const raw = Math.max(1, highest) / 4;
+  const magnitude = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((n) => n * magnitude).find((n) => n >= raw) ?? 10 * magnitude;
+  return { max: Math.ceil(highest / step || 1) * step, step };
+}
 
-/** Etiquetas del eje sin separador de miles, como en el diseño ("₡1050"). */
-const axisLabel = (value: number) => `₡${value}`;
+function shortInstitution(name: string): string {
+  const normalized = name.toLowerCase();
+  if (normalized.includes('tecnológico de costa rica') || normalized.includes('tecnologico de costa rica')) return 'TEC';
+  if (normalized.includes('universidad de costa rica')) return 'UCR';
+  if (normalized.includes('universidad nacional')) return 'UNA';
+  if (normalized.includes('universidad estatal a distancia')) return 'UNED';
+  return name;
+}
+
+const money = (amount: number | null) => amount === null ? 'Sin datos' : formatColones(amount);
 
 /** Consulta 5 · Monto promedio (340:3079) con tooltips `Promedio1–4` al pasar el cursor. */
 export function AverageAmountView() {
-  const options = useInstitutionOptions();
+  const [options, setOptions] = useState<InstitutionFilterOption[]>([
+    { label: ALL_INSTITUTIONS, code: null },
+  ]);
+  const [institutionIds, setInstitutionIds] = useState<Record<string, number>>({});
   const [institution, setInstitution] = useState(ALL_INSTITUTIONS);
-  const [from, setFrom] = useState<IsoDate | null>(DEFAULT_FROM);
-  const [to, setTo] = useState<IsoDate | null>(DEFAULT_TO);
-  const [query, setQuery] = useState<AverageAmountQuery | null>(null);
+  const [from, setFrom] = useState<IsoDate | null>(null);
+  const [to, setTo] = useState<IsoDate | null>(null);
+  const [query, setQuery] = useState<RespuestaMontoPromedio | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [institutionsError, setInstitutionsError] = useState<string | null>(null);
 
-  const code = institutionCode(options, institution);
+  // No usamos las instituciones simuladas de las otras consultas.
+  useEffect(() => {
+    let active = true;
+    listarInstituciones()
+      .then((institutions) => {
+        if (!active) return;
+        const ids: Record<string, number> = {};
+        const nextOptions: InstitutionFilterOption[] = [{ label: ALL_INSTITUTIONS, code: null }];
+        for (const item of institutions) {
+          // `code` es solo para el componente compartido; el filtro real usa IDs de la BD.
+          ids[item.nombre] = item.id;
+          nextOptions.push({ label: item.nombre, code: null });
+        }
+        setInstitutionIds(ids);
+        setOptions(nextOptions);
+      })
+      .catch((reason: unknown) => {
+        if (active) setInstitutionsError(mensajesDe(reason).join(' '));
+      });
+    return () => { active = false; };
+  }, []);
+
+  const invalidRange = Boolean(from && to && from > to);
+  const selectedId = institution === ALL_INSTITUTIONS ? undefined : institutionIds[institution];
 
   useEffect(() => {
-    let mounted = true;
-    getAverageAmount({ institution: code }).then((result) => mounted && setQuery(result));
-    return () => {
-      mounted = false;
-    };
-  }, [code]);
+    if (invalidRange || (institution !== ALL_INSTITUTIONS && selectedId === undefined)) {
+      setQuery(null);
+      setLoading(false);
+      return;
+    }
+    let active = true;
+    setLoading(true);
+    setError(null);
+    setQuery(null);
+    consultarMontoPromedio({
+      institucionId: selectedId,
+      desde: from ?? undefined,
+      hasta: to ?? undefined,
+    })
+      .then((result) => { if (active) setQuery(result); })
+      .catch((reason: unknown) => { if (active) setError(mensajesDe(reason).join(' ')); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [selectedId, institution, from, to, invalidRange]);
+
+  const chartData = (query?.promedioPorInstitucion ?? []).map((item) => ({
+    key: String(item.institucionId),
+    label: shortInstitution(item.institucion),
+    value: item.montoPromedio,
+  }));
+  const scale = chartScale(chartData.map((item) => item.value));
 
   const reset = () => {
     setInstitution(ALL_INSTITUTIONS);
-    setFrom(DEFAULT_FROM);
-    setTo(DEFAULT_TO);
+    setFrom(null);
+    setTo(null);
   };
 
   return (
@@ -61,60 +121,83 @@ export function AverageAmountView() {
       <ResultsCard
         title="Promedio del monto cobrado"
         subtitle="Promedio del monto cobrado por conductores en viajes con cobro."
-        showing={query?.tripsWithCharge}
+        showing={query?.viajesConCobro}
         totalLabel="Viajes en el periodo"
-        total={query?.tripsInPeriod}
+        total={query?.viajesEnPeriodo}
       >
-        {query === null ? (
+        {invalidRange ? (
+          <Text style={styles.message}>La fecha «Desde» no puede ser posterior a «Hasta».</Text>
+        ) : institutionsError || error ? (
+          <Text style={styles.message}>{institutionsError ?? error}</Text>
+        ) : loading || query === null ? (
           <ActivityIndicator color={palette.lime} style={styles.loading} />
+        ) : query.viajesEnPeriodo === 0 ? (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyStateIcon}>
+              <MaterialCommunityIcons
+                name="clipboard-text-outline"
+                size={30}
+                color={palette.terracotta}
+                accessible={false}
+              />
+            </View>
+
+            <Text style={styles.emptyStateTitle}>No hay viajes registrados</Text>
+
+            <Text style={styles.emptyStateDescription}>
+              {institution === ALL_INSTITUTIONS
+                ? 'No se encontraron viajes con los filtros seleccionados.'
+                : from || to
+                  ? `No se encontraron viajes para ${institution} en el período seleccionado.`
+                  : `No se encontraron viajes para ${institution}.`}
+            </Text>
+          </View>
         ) : (
           <View style={styles.body}>
             <View style={styles.kpis}>
               <View style={[styles.kpi, styles.kpiMain]}>
                 <Text style={styles.kpiLabel}>Monto promedio por viaje</Text>
-                <Text style={[styles.kpiValue, styles.kpiMainValue]}>{formatColones(query.average)}</Text>
-                <Text style={styles.kpiLabel}>Calculado sobre {query.tripsWithCharge} viajes con cobro</Text>
+                <Text style={[styles.kpiValue, styles.kpiMainValue]}>{money(query.montoPromedio)}</Text>
+                <Text style={styles.kpiLabel}>Calculado sobre {query.viajesConCobro} viajes con cobro</Text>
               </View>
               <View style={styles.kpiRow}>
                 <View style={[styles.kpi, styles.kpiGreen]}>
                   <Text style={styles.kpiLabel}>Mínimo</Text>
-                  <Text style={styles.kpiValue}>{formatColones(query.min)}</Text>
+                  <Text style={styles.kpiValue}>{money(query.montoMinimo)}</Text>
                   <Text style={styles.kpiLabel}>Monto más bajo</Text>
                 </View>
                 <View style={[styles.kpi, styles.kpiGreen]}>
                   <Text style={styles.kpiLabel}>Máximo</Text>
-                  <Text style={styles.kpiValue}>{formatColones(query.max)}</Text>
+                  <Text style={styles.kpiValue}>{money(query.montoMaximo)}</Text>
                   <Text style={styles.kpiLabel}>Monto más alto</Text>
                 </View>
               </View>
               <View style={styles.footnote}>
                 <IconInfo color={palette.greyMedium} />
                 <Text style={styles.footnoteText}>
-                  {query.tripsWithoutCharge} viajes sin cobro no se incluyen en el promedio.
+                  {query.viajesSinCobro} viajes sin cobro no se incluyen en el promedio.
                 </Text>
               </View>
             </View>
 
             <View style={styles.chart}>
               <Text style={styles.chartTitle}>Promedio por institución</Text>
-              <ValueBarChart
-                data={query.byInstitution.map((item) => ({
-                  key: item.institution,
-                  label: item.institution,
-                  value: item.average,
-                }))}
-                max={AXIS_MAX}
-                step={AXIS_STEP}
+              {chartData.length === 0 ? (
+                <Text style={styles.empty}>No hay viajes con cobro para los filtros seleccionados.</Text>
+              ) : <ValueBarChart
+                data={chartData}
+                max={scale.max}
+                step={scale.step}
                 height={283}
                 color={palette.terracotta}
-                formatValue={(value) => (value % AXIS_STEP === 0 ? axisLabel(value) : formatColones(value))}
+                formatValue={formatColones}
                 renderTooltip={(datum) => (
                   <View style={styles.tooltip}>
                     <Text style={styles.tooltipTitle}>{datum.label}</Text>
                     <Text style={styles.tooltipValue}>Promedio: {formatColones(datum.value)}</Text>
                   </View>
                 )}
-              />
+              />}
             </View>
           </View>
         )}
@@ -124,9 +207,9 @@ export function AverageAmountView() {
 }
 
 const styles = StyleSheet.create({
-  loading: {
-    marginTop: 40,
-  },
+  loading: { marginTop: 40 },
+  message: { padding: 24, color: palette.terracotta, fontFamily: fonts.cairoMedium, fontSize: 16 },
+  empty: { paddingTop: 36, color: palette.greyMedium, fontFamily: fonts.cairoMedium },
   body: {
     flexDirection: 'row',
     paddingTop: 24,
@@ -190,7 +273,7 @@ const styles = StyleSheet.create({
   },
   tooltip: {
     width: 141,
-    height: 68,
+    minHeight: 68,
     borderRadius: 5,
     borderWidth: 1.8,
     borderColor: palette.terracotta,
@@ -207,5 +290,34 @@ const styles = StyleSheet.create({
     fontFamily: fonts.cairoSemiBold,
     fontSize: 15,
     color: palette.terracotta,
+  },
+  emptyState: {
+  minHeight: 220,
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  paddingHorizontal: 24,
+  paddingVertical: 32,
+  },
+  emptyStateIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: palette.terracottaLight,
+  },
+  emptyStateTitle: {
+    fontFamily: fonts.cairoBold,
+    fontSize: 20,
+    color: webColors.headerText,
+    textAlign: 'center',
+  },
+  emptyStateDescription: {
+    maxWidth: 420,
+    fontFamily: fonts.cairoMedium,
+    fontSize: 15,
+    color: palette.greyMedium,
+    textAlign: 'center',
   },
 });
