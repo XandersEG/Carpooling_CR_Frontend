@@ -8,7 +8,7 @@ import { SearchSummary } from '@/components/mobile/SearchSummary';
 import { SegmentedControl } from '@/components/mobile/SegmentedControl';
 import { TripCard } from '@/components/mobile/TripCard';
 import { LoadState } from '@/components/mobile/passenger/LoadState';
-import { formatSearchDate, formatSearchTime, getLastSearch } from '@/components/mobile/passenger/search';
+import { formatSearchDate, formatSearchTime, getLastSearch, toRouteParams } from '@/components/mobile/passenger/search';
 import { TripMapView } from '@/components/mobile/passenger/TripMapView';
 import { myTripCard } from '@/components/mobile/passenger/tripHelpers';
 import { useServiceData } from '@/components/mobile/passenger/useServiceData';
@@ -54,13 +54,15 @@ export default function MisViajesScreen() {
             }
           />
           <View style={styles.controls}>
-            <SearchSummary
-              origin={search.origin}
-              destination={search.destination}
-              dateLabel={formatSearchDate(search.date)}
-              timeLabel={formatSearchTime(search.time)}
-              onEdit={() => router.push({ pathname: '/buscar', params: search })}
-            />
+            {search.origin || search.destination ? (
+              <SearchSummary
+                origin={search.origin}
+                destination={search.destination}
+                dateLabel={formatSearchDate(search.date)}
+                timeLabel={formatSearchTime(search.time)}
+                onEdit={() => router.push({ pathname: '/buscar', params: toRouteParams(search) })}
+              />
+            ) : null}
             <SegmentedControl options={VIEW_OPTIONS} value={view} onChange={setView} />
           </View>
         </>
@@ -68,6 +70,8 @@ export default function MisViajesScreen() {
     >
       {myTrips.loading || myTrips.error ? (
         <LoadState loading={myTrips.loading} error={myTrips.error} />
+      ) : items.length === 0 ? (
+        <LoadState loading={false} error="Todavía no tienes viajes." />
       ) : view === 'lista' ? (
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
           {items.map((item) => (

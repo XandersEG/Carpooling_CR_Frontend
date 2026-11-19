@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 
 import { MapLabel, MapView } from '@/components/mobile/MapView';
+import { RouteMap } from '@/components/mobile/RouteMap';
+import type { GeoPoint } from '@/src/types/common';
 import { TripCard, type TripCardProps } from '@/components/mobile/TripCard';
 import { colors, layout, radius, spacing } from '@/src/constants/theme';
 
@@ -18,6 +20,9 @@ export type TripMapItem = {
   key: string;
   card: Omit<TripCardProps, 'onPress' | 'style'>;
   onPress: () => void;
+  /** Real route points; without them the static drawing of the design is shown. */
+  originPoint?: GeoPoint;
+  destinationPoint?: GeoPoint;
 };
 
 type TripMapViewProps = {
@@ -37,7 +42,10 @@ const CANVAS_HEIGHT = 350;
 export function TripMapView({ items }: TripMapViewProps) {
   const [index, setIndex] = useState(0);
   const [pageWidth, setPageWidth] = useState(0);
+  // height of the cards at the bottom, kept clear when fitting the route on the map
+  const [bottomHeight, setBottomHeight] = useState(0);
   const current = items[Math.min(index, items.length - 1)];
+  const hasRealRoute = Boolean(current?.originPoint && current?.destinationPoint);
 
   function handleScrollEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
     if (!pageWidth) return;
@@ -46,9 +54,21 @@ export function TripMapView({ items }: TripMapViewProps) {
 
   return (
     <View style={styles.container}>
-      <MapView style={StyleSheet.absoluteFill} />
-      <View style={styles.canvasArea}>
-        {current ? (
+      {hasRealRoute ? (
+        // the route of the trip whose card is showing; swiping the cards changes it
+        <RouteMap
+          style={StyleSheet.absoluteFill}
+          origin={current?.originPoint}
+          destination={current?.destinationPoint}
+          originLabel={current?.card.origin}
+          destinationLabel={current?.card.destination}
+          insets={{ bottom: bottomHeight }}
+        />
+      ) : (
+        <MapView style={StyleSheet.absoluteFill} />
+      )}
+      <View style={styles.canvasArea} pointerEvents="box-none">
+        {current && !hasRealRoute ? (
           <MapCanvas height={CANVAS_HEIGHT}>
             <View pointerEvents="none" style={[styles.route, ROUTE]}>
               <RutaResultados width={260} height={280} />
@@ -61,7 +81,7 @@ export function TripMapView({ items }: TripMapViewProps) {
         ) : null}
       </View>
       {items.length > 0 ? (
-        <View style={styles.bottom}>
+        <View style={styles.bottom} onLayout={(event) => setBottomHeight(event.nativeEvent.layout.height)}>
           <View style={styles.counterRow}>
             <MapLabel
               text={`${Math.min(index, items.length - 1) + 1} de ${items.length} viajes`}

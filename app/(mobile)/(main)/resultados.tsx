@@ -8,7 +8,13 @@ import { SearchSummary } from '@/components/mobile/SearchSummary';
 import { SegmentedControl } from '@/components/mobile/SegmentedControl';
 import { TripCard } from '@/components/mobile/TripCard';
 import { LoadState } from '@/components/mobile/passenger/LoadState';
-import { formatSearchDate, formatSearchTime, readSearchParams } from '@/components/mobile/passenger/search';
+import {
+  formatSearchDate,
+  formatSearchTime,
+  readSearchParams,
+  toRouteParams,
+  type SearchRouteParams,
+} from '@/components/mobile/passenger/search';
 import { TripMapView } from '@/components/mobile/passenger/TripMapView';
 import { searchResultCard } from '@/components/mobile/passenger/tripHelpers';
 import { useServiceData } from '@/components/mobile/passenger/useServiceData';
@@ -24,12 +30,21 @@ const VIEW_OPTIONS: { value: ResultsView; label: string }[] = [
 
 /** "Resultados viajes" (Figma 2446:2252) y "Resultados mapa" (Figma 2448:2302). */
 export default function ResultadosScreen() {
-  const params = useLocalSearchParams<{ origin?: string; destination?: string; date?: string; time?: string }>();
+  const params = useLocalSearchParams<SearchRouteParams>();
   const search = readSearchParams(params);
   const [view, setView] = useState<ResultsView>('lista');
   const results = useServiceData(
     () => searchTrips(search),
-    [search.origin, search.destination, search.date, search.time],
+    [
+      search.origin,
+      search.destination,
+      search.date,
+      search.time,
+      search.originPoint?.lat,
+      search.originPoint?.lng,
+      search.destinationPoint?.lat,
+      search.destinationPoint?.lng,
+    ],
   );
   const trips = results.data ?? [];
 
@@ -39,7 +54,7 @@ export default function ResultadosScreen() {
 
   function editSearch() {
     if (router.canGoBack()) router.back();
-    else router.replace({ pathname: '/buscar', params: search });
+    else router.replace({ pathname: '/buscar', params: toRouteParams(search) });
   }
 
   return (
@@ -78,6 +93,8 @@ export default function ResultadosScreen() {
               key: trip.id,
               card: searchResultCard(trip),
               onPress: () => openTrip(trip.id),
+              originPoint: trip.originPoint,
+              destinationPoint: trip.destinationPoint,
             }))}
           />
         </View>

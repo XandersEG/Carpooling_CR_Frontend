@@ -1,4 +1,6 @@
-import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { color, fuente } from '@/src/features/admin/theme';
 import { useLayout } from '@/src/features/admin/useLayout';
@@ -8,11 +10,14 @@ type Props = TextInputProps & {
   label?: string;
   // marca el campo en color de error
   conError?: boolean;
+  // campo de contraseña: la oculta y trae el botón del ojo para mostrarla
+  contrasena?: boolean;
 };
 
 // campo de texto con su etiqueta
-export function Field({ label, conError = false, style, ...input }: Props) {
+export function Field({ label, conError = false, contrasena = false, style, ...input }: Props) {
   const { angosta } = useLayout();
+  const [visible, setVisible] = useState(false);
 
   return (
     <View style={styles.campo}>
@@ -20,14 +25,30 @@ export function Field({ label, conError = false, style, ...input }: Props) {
       <TextInput
         accessibilityLabel={label}
         placeholderTextColor={color.textoSuave}
+        secureTextEntry={contrasena ? !visible : undefined}
         style={[
           styles.entrada,
           angosta ? styles.entradaTactil : null,
           conError ? styles.entradaConError : null,
+          contrasena ? (angosta ? styles.entradaConOjoTactil : styles.entradaConOjo) : null,
           style,
         ]}
         {...input}
       />
+      {contrasena ? (
+        <Pressable
+          onPress={() => setVisible(!visible)}
+          accessibilityRole="button"
+          accessibilityLabel={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+          style={[styles.ojo, angosta ? styles.ojoTactil : null]}
+        >
+          <Ionicons
+            name={visible ? 'eye-off-outline' : 'eye-outline'}
+            size={18}
+            color={color.grisOscuro}
+          />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -60,5 +81,27 @@ const styles = StyleSheet.create({
   },
   entradaConError: {
     borderColor: color.terracota,
+  },
+  // el texto no pasa por debajo del ojo
+  entradaConOjo: {
+    paddingRight: 38,
+  },
+  entradaConOjoTactil: {
+    paddingRight: 46,
+  },
+  // el ojo queda dentro del campo, a la derecha
+  ojo: {
+    position: 'absolute',
+    right: 2,
+    bottom: 0,
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ojoTactil: {
+    right: 0,
+    width: 44,
+    height: 44,
   },
 });

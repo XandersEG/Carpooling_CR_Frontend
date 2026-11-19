@@ -2,8 +2,10 @@ import type { LoginCredentials, LoginResponse } from '@/src/types/auth';
 import type { IsoDate } from '@/src/types/common';
 import type { Role } from '@/src/types/user';
 
+import { apiRequest } from './apiClient';
 import { USE_MOCK_DATA } from './config';
 import { delay } from './mock/utils';
+import { setSessionToken } from './session';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -26,11 +28,10 @@ function requireApiUrl(): string {
 }
 
 /**
- * Inicia sesión contra el Backend.
+ * Inicia sesión contra el Backend y guarda el token de la sesión.
  *
  * Con datos simulados responde con un token ficticio después de una breve
- * espera. Provisional: la ruta `/auth/login` y la respuesta deben coordinarse
- * con el equipo de Backend antes de integrarse.
+ * espera.
  */
 export async function login(credentials: LoginCredentials): Promise<LoginResponse> {
   if (USE_MOCK_DATA) {
@@ -38,17 +39,9 @@ export async function login(credentials: LoginCredentials): Promise<LoginRespons
     return { token: 'mock-token' };
   }
 
-  const response = await fetch(`${requireApiUrl()}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(credentials),
-  });
-
-  if (!response.ok) {
-    throw new Error('Correo o contraseña incorrectos.');
-  }
-
-  return (await response.json()) as LoginResponse;
+  const session = await apiRequest<LoginResponse>('/auth/login', { method: 'POST', body: credentials });
+  setSessionToken(session.token);
+  return session;
 }
 
 /**

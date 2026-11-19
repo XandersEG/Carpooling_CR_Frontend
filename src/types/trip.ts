@@ -1,4 +1,4 @@
-import type { Colones, Id, IsoDate, IsoDateTime, PaymentMethodRef, Place } from '@/src/types/common';
+import type { Colones, GeoPoint, Id, IsoDate, IsoDateTime, PaymentMethodRef, Place } from '@/src/types/common';
 import type { PersonSummary, Role } from '@/src/types/user';
 import type { TripVehicle } from '@/src/types/vehicle';
 
@@ -24,6 +24,9 @@ export type Trip = {
   status: TripStatus;
   distanceKm?: number;
   estimatedMinutes?: number;
+  /** Map points of the route (only trips from the Backend have them). */
+  originPoint?: GeoPoint;
+  destinationPoint?: GeoPoint;
 };
 
 /** Filtros de la pantalla "Buscar rutas". */
@@ -33,6 +36,9 @@ export type TripSearchParams = {
   date: IsoDate;
   /** Hora de salida en formato `HH:mm`. */
   time: string;
+  /** Points of the places picked from the suggestions; without them the search does not filter by place. */
+  originPoint?: GeoPoint;
+  destinationPoint?: GeoPoint;
 };
 
 /** Solicitud de un pasajero para unirse a un viaje. */
@@ -58,9 +64,12 @@ export type PassengerTrip = {
 /** Parada en el recorrido de un viaje (pestaña "Paradas"). */
 export type TripStop = {
   place: Place;
-  time: IsoDateTime;
+  /** Coordenadas que manda el Backend. El mapa estático (D3) todavía no las usa. */
+  point?: GeoPoint;
+  /** El Backend todavía no guarda la hora estimada de las recogidas. */
+  time?: IsoDateTime;
   kind: 'origen' | 'recogida' | 'destino';
-  /** Pasajero que se recoge en esta parada. */
+  /** Pasajero (o pasajeros, "Ana y Luis") que se recogen en esta parada. */
   passengerName?: string;
 };
 
@@ -76,12 +85,20 @@ export type DriverTrip = Trip & {
 export type PublishTripInput = {
   vehicleId: Id;
   origin: Place;
+  /** Origin point picked on the map; the Backend requires coordinates. */
+  originPoint: GeoPoint;
   destination: Place;
+  destinationPoint: GeoPoint;
   departureAt: IsoDateTime;
   seats: number;
   costPerPassenger: Colones;
   paymentMethodId: Id;
 };
+
+
+
+/** Estado de una solicitud en la pantalla "Solicitudes" del conductor. */
+export type IncomingRequestStatus = 'pendiente' | 'aceptada' | 'rechazada';
 
 /**
  * Tarjeta de la pantalla "Solicitudes" del conductor.
@@ -93,13 +110,14 @@ export type PublishTripInput = {
  */
 export type IncomingRequest = {
   id: Id;
-  tripId?: Id;
+  tripId: Id;
+  passenger: PersonSummary;
+  pickupPoint: Place;
   origin: Place;
   destination: Place;
-  departureAt?: IsoDateTime;
-  arrivalAt?: IsoDateTime;
-  passengers: JoinRequest[];
-  status: 'pendiente' | 'aceptada' | 'rechazada';
+  departureAt: IsoDateTime;
+  amount: Colones;
+  status: IncomingRequestStatus;
 };
 
 /** Elemento del "Historial de viajes". */

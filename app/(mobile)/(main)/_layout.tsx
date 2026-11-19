@@ -13,7 +13,14 @@ export default function MainLayout() {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }} />
+        {/* ios_from_right: smoother slide on Android (iOS already slides this way) */}
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.background },
+            animation: 'ios_from_right',
+          }}
+        />
       </View>
       <TabBar />
     </View>

@@ -55,7 +55,7 @@ export function requestStatusChip(status: JoinRequestStatus): StatusChip {
       return { label: 'Rechazada', tone: 'orange' };
     case 'cancelada':
     default:
-      return { label: 'Cancelada', tone: 'orange' };
+      return { label: 'Cancelado', tone: 'orange' };
   }
 }
 
@@ -81,13 +81,15 @@ export function searchResultCard(trip: Trip): Omit<TripCardProps, 'onPress' | 's
 
 /**
  * Tarjeta de "Mis Viajes". En la lista el diseño muestra la fecha completa y el
- * pago en verde; en la vista de mapa, solo la hora y el pago en naranja.
+ * pago en verde; en la vista de mapa, solo la hora y el pago en naranja. Un viaje
+ * aprobado que ya terminó se marca "Finalizado" (no diseñado).
  */
 export function myTripCard(item: PassengerTrip, view: 'lista' | 'mapa'): Omit<TripCardProps, 'onPress' | 'style'> {
   const { trip } = item;
+  const finished = item.status === 'aprobada' && trip.status === 'finalizado';
   const chips: TripCardChip[] = [
     { label: view === 'lista' ? formatCardDateTime(trip.departureAt) : formatTime(trip.departureAt), tone: 'green' },
-    tripStatusChip(item.status),
+    finished ? { label: 'Finalizado', tone: 'neutral' } : tripStatusChip(item.status),
     { label: paymentLabel(trip), tone: view === 'lista' ? 'green' : 'orange' },
   ];
   return { ...baseCardProps(trip), chips };

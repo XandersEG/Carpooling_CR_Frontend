@@ -7,7 +7,10 @@
  * totales de las etiquetas no se recalculan.
  */
 import type {
+  AgeRangeStat,
   AverageAmountQuery,
+  DistributionSlice,
+  EstadisticasRespuesta,
   InstitutionCode,
   InstitutionFilterOption,
   NewUsersQuery,
@@ -20,6 +23,9 @@ import { toIsoDate } from '@/src/utils/format';
 
 import * as fixtures from '../mock/fixtures/analytics';
 import { respond } from '../mock/utils';
+
+import { obtenerEstadisticas } from '@/src/features/admin/api';
+import { USE_MOCK_DATA } from '../config';
 
 export type RankingKind = 'conductores' | 'puntos' | 'usuarios';
 
@@ -88,8 +94,85 @@ export async function getNewUsers(filters: TableFilters & { months: number }): P
   });
 }
 
-export async function getStatistics(): Promise<StatisticsSummary> {
-  return respond(fixtures.statistics);
+
+const TODOS_LOS_GENEROS = 'Todos los géneros';
+const OTRO_GENERO = 'Otro / No indica';
+const ORDEN_GENEROS = ['Femenino', 'Masculino', OTRO_GENERO];
+
+function agruparGenero(nombre: string): string {
+  return nombre === 'Femenino' || nombre === 'Masculino' ? nombre : OTRO_GENERO;
+}
+
+function porcentaje(parte: number, total: number): number {
+  return total > 0 ? (parte * 100) / total : 0;
+}
+
+function sumar(filas: { total: number }[]): number {
+  return filas.reduce((suma, fila) => suma + fila.total, 0);
+}
+
+function aSlices(filas: { label: string; count: number }[]): DistributionSlice[] {
+  const total = filas.reduce((suma, fila) => suma + fila.count, 0);
+  return filas.map((fila) => ({
+    key: fila.label.toLowerCase(),
+    label: fila.label,
+    count: fila.count,
+    percent: porcentaje(fila.count, total),
+  }));
+}
+
+function porGenero(filas: { genero: string; total: number }[]): DistributionSlice[] {
+  return aSlices(
+    ORDEN_GENEROS.map((label) => ({
+      label,
+      count: sumar(filas.filter((fila) => agruparGenero(fila.genero) === label)),
+    })),
+  );
+}
+
+function porRangoEdad(filas: EstadisticasRespuesta['rangoEdad'], genero: string): AgeRangeStat[] {
+  const elegidas = filas.filter((fila) => genero === TODOS_LOS_GENEROS || agruparGenero(fila.genero) === genero);
+  const rangos = [...new Set(filas.map((fila) => fila.rango))];
+  const conteos = rangos.map((rango) => ({
+    label: rango,
+    count: sumar(elegidas.filter((fila) => fila.rango === rango)),
+  }));
+  const total = conteos.reduce((suma, fila) => suma + fila.count, 0);
+  return conteos.map((fila) => ({ ...fila, percent: porcentaje(fila.count, total) }));
+}
+
+
+
+export type StatisticsFilters = {
+  institucionId?: number;
+  desde?: IsoDate | null;
+  hasta?: IsoDate | null;
+};
+
+export async function getStatistics(
+  filtros: StatisticsFilters = {},
+  genero: string = TODOS_LOS_GENEROS,
+): Promise<StatisticsSummary> {
+  if (USE_MOCK_DATA) {
+    return respond(fixtures.statistics);
+  }
+
+  const datos = await obtenerEstadisticas({
+    institucionId: filtros.institucionId,
+    desde: filtros.desde ?? undefined,
+    hasta: filtros.hasta ?? undefined,
+  });
+
+  return {
+    activeDrivers: datos.resumenDatos.conductoresActivos,
+    activePassengers: datos.resumenDatos.pasajerosActivos,
+    uniqueUsers: datos.resumenDatos.usuariosUnicos,
+    bothRoles: datos.resumenDatos.ambosRoles,
+    driversByGender: porGenero(datos.conductoresGenero),
+    passengersByGender: porGenero(datos.pasajerosGenero),
+    tripsByPaymentMethod: aSlices(datos.viajesMetodo.map((fila) => ({ label: fila.metodo, count: fila.total }))),
+    usersByAgeRange: porRangoEdad(datos.rangoEdad, genero),
+  };
 }
 
 export async function listGenderFilterOptions(): Promise<string[]> {

@@ -11,6 +11,8 @@ import type {
   ValorCatalogo,
 } from './types';
 
+import type { EstadisticasRespuesta } from '@/src/types/analytics';
+
 // llamadas al api del portal administrativo
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
@@ -230,7 +232,7 @@ export const actualizarAdministrador = (
 
 // con "recordar" el servidor da una sesión más larga
 export const iniciarSesion = (correo: string, password: string, recordar: boolean) =>
-  pedir<{ token: string; nombre: string }>('/admin/auth/login', {
+  pedir<{ token: string; id: number; nombre: string }>('/admin/auth/login', {
     metodo: 'POST',
     cuerpo: { correo, password, recordar },
     sinSesion: true,
@@ -279,3 +281,9 @@ export const consultarMontoPromedio = (filtros: {
   desde?: string;
   hasta?: string;
 }) => pedir<RespuestaMontoPromedio>('/admin/consultas/monto-promedio', { consulta: filtros });
+
+
+/* --------------------------------- estadisticas ------------------------------- */
+
+export const obtenerEstadisticas = (filtros: { institucionId?: number; desde?: string; hasta?: string }) => 
+                                    pedir<EstadisticasRespuesta>('/statistics', { consulta: filtros });

@@ -19,6 +19,8 @@ export default function VehiclesScreen() {
   const [vehicles, setVehicles] = useState<Vehicle[] | null>(null);
   const [toDelete, setToDelete] = useState<Vehicle | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Backend error on delete (e.g. the vehicle has trips)
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -35,11 +37,14 @@ export default function VehiclesScreen() {
   const confirmDelete = async () => {
     if (!toDelete) return;
     setDeleting(true);
+    setDeleteError(null);
     try {
       await deleteVehicle(toDelete.id);
       setVehicles((current) => current?.filter((item) => item.id !== toDelete.id) ?? null);
-      setToDelete(null);
+    } catch (cause) {
+      setDeleteError(cause instanceof Error ? cause.message : 'No se pudo eliminar el vehículo.');
     } finally {
+      setToDelete(null);
       setDeleting(false);
     }
   };
@@ -60,6 +65,7 @@ export default function VehiclesScreen() {
       }
     >
       <Text style={styles.subtitle}>Gestiona los vehículos que utilizas para publicar viajes</Text>
+      {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
       {vehicles === null ? (
         <ActivityIndicator color={colors.primary} style={styles.loading} />
       ) : (
@@ -107,6 +113,10 @@ const styles = StyleSheet.create({
   },
   loading: {
     marginTop: spacing.xl * 2,
+  },
+  error: {
+    ...typography.textSmall,
+    color: colors.error,
   },
   dialogIcon: {
     width: 28,

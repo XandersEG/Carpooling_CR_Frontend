@@ -81,13 +81,13 @@ export function DriverTripMap({ stops, style }: DriverTripMapProps) {
         </View>
         <StopPin left={33} top={268} />
         <DestinationPin style={{ left: 336, top: 38 }} />
-        {pickups.map((stop, index) => (
-          <StopPin key={`pin-${stop.place.name}`} {...PICKUP_POSITIONS[index].pin} />
+        {pickups.map((_stop, index) => (
+          <StopPin key={`pin-${index}`} {...PICKUP_POSITIONS[index].pin} />
         ))}
         {origin ? <MapLabel text={origin.place.name} style={{ left: 46, top: 288 }} /> : null}
         {destination ? <MapLabel text={destination.place.name} style={{ right: 82, top: 19 }} /> : null}
         {pickups.map((stop, index) => (
-          <MapLabel key={`label-${stop.place.name}`} text={stop.place.name} style={PICKUP_POSITIONS[index].label} />
+          <MapLabel key={`label-${index}`} text={stop.place.name} style={PICKUP_POSITIONS[index].label} />
         ))}
       </View>
     </MapView>
