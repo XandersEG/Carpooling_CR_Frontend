@@ -145,7 +145,9 @@ export function RankingQueryView({ kind }: { kind: RankingKind }) {
         <TableHeaderRow>
           <Text style={[analyticsStyles.headerText, styles.positionHeader]}>POSICIÓN</Text>
           <Text style={[analyticsStyles.headerText, styles.name]}>{config.nameHeader}</Text>
-          <Text style={[analyticsStyles.headerText, styles.institution]}>INSTITUCIÓN</Text>
+          <Text style={[analyticsStyles.headerText, styles.institution, styles.institutionHeader]}>
+            INSTITUCIÓN
+          </Text>
           <Text style={[analyticsStyles.headerText, styles.trips, styles.tripsHeader]}>VIAJES</Text>
         </TableHeaderRow>
         {institutionError || queryError ? (
@@ -178,19 +180,24 @@ export function RankingQueryView({ kind }: { kind: RankingKind }) {
 
 const styles = StyleSheet.create({
   positionHeader: {
-    flex: 311,
-    paddingLeft: 50,
+    flex: 310,
+    paddingLeft: 30,
   },
   position: {
-    flex: 311,
-    paddingLeft: 67,
+    flex: 280,
+    paddingLeft: 45,
   },
   name: {
-    flex: 481,
+    flex: 450,
     paddingRight: 12,
   },
   institution: {
-    flex: 366,
+    flex: 406,
+    minWidth: 0,
+  },
+  institutionHeader: {
+    textAlign: 'left',
+    marginLeft: 60,
   },
   trips: {
     flex: 313,
