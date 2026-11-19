@@ -53,9 +53,6 @@ export function Screen({
           {celular ? null : <Text style={styles.subtitulo}>{subtitle}</Text>}
         </View>
         {celular ? null : action}
-        <View style={styles.campana}>
-          <Ionicons name="notifications-outline" size={18} color={color.terracota} />
-        </View>
         {sesion ? (
           angosta ? (
             // el nombre y el rol se ven en el menú; aquí solo cabe el avatar

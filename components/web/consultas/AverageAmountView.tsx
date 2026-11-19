@@ -10,11 +10,9 @@ import { consultarMontoPromedio, listarInstituciones, mensajesDe, type Respuesta
 import type { InstitutionFilterOption } from '@/src/types/analytics';
 import type { IsoDate } from '@/src/types/common';
 import { fonts, palette, webColors } from '@/src/constants/theme';
-import { formatColones } from '@/src/utils/format';
+import { formatColones, toIsoDate  } from '@/src/utils/format';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
-// Rango predeterminado del diseño; los filtros ahora se consultan en el backend.
-const DEFAULT_FROM: IsoDate = '2026-01-01';
-const DEFAULT_TO: IsoDate = '2026-10-15';
 /** Ajustar el eje a montos reales; el diseño original asumía un máximo fijo de ₡1400. */
 function chartScale(values: number[]): { max: number; step: number } {
   const highest = Math.max(0, ...values);
@@ -42,8 +40,8 @@ export function AverageAmountView() {
   ]);
   const [institutionIds, setInstitutionIds] = useState<Record<string, number>>({});
   const [institution, setInstitution] = useState(ALL_INSTITUTIONS);
-  const [from, setFrom] = useState<IsoDate | null>(DEFAULT_FROM);
-  const [to, setTo] = useState<IsoDate | null>(DEFAULT_TO);
+  const [from, setFrom] = useState<IsoDate | null>(null);
+  const [to, setTo] = useState<IsoDate | null>(null);
   const [query, setQuery] = useState<RespuestaMontoPromedio | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,8 +102,8 @@ export function AverageAmountView() {
 
   const reset = () => {
     setInstitution(ALL_INSTITUTIONS);
-    setFrom(DEFAULT_FROM);
-    setTo(DEFAULT_TO);
+    setFrom(null);
+    setTo(null);
   };
 
   return (
@@ -133,6 +131,27 @@ export function AverageAmountView() {
           <Text style={styles.message}>{institutionsError ?? error}</Text>
         ) : loading || query === null ? (
           <ActivityIndicator color={palette.lime} style={styles.loading} />
+        ) : query.viajesEnPeriodo === 0 ? (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyStateIcon}>
+              <MaterialCommunityIcons
+                name="clipboard-text-outline"
+                size={30}
+                color={palette.terracotta}
+                accessible={false}
+              />
+            </View>
+
+            <Text style={styles.emptyStateTitle}>No hay viajes registrados</Text>
+
+            <Text style={styles.emptyStateDescription}>
+              {institution === ALL_INSTITUTIONS
+                ? 'No se encontraron viajes con los filtros seleccionados.'
+                : from || to
+                  ? `No se encontraron viajes para ${institution} en el período seleccionado.`
+                  : `No se encontraron viajes para ${institution}.`}
+            </Text>
+          </View>
         ) : (
           <View style={styles.body}>
             <View style={styles.kpis}>
@@ -254,7 +273,7 @@ const styles = StyleSheet.create({
   },
   tooltip: {
     width: 141,
-    height: 68,
+    minHeight: 68,
     borderRadius: 5,
     borderWidth: 1.8,
     borderColor: palette.terracotta,
@@ -271,5 +290,34 @@ const styles = StyleSheet.create({
     fontFamily: fonts.cairoSemiBold,
     fontSize: 15,
     color: palette.terracotta,
+  },
+  emptyState: {
+  minHeight: 220,
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  paddingHorizontal: 24,
+  paddingVertical: 32,
+  },
+  emptyStateIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: palette.terracottaLight,
+  },
+  emptyStateTitle: {
+    fontFamily: fonts.cairoBold,
+    fontSize: 20,
+    color: webColors.headerText,
+    textAlign: 'center',
+  },
+  emptyStateDescription: {
+    maxWidth: 420,
+    fontFamily: fonts.cairoMedium,
+    fontSize: 15,
+    color: palette.greyMedium,
+    textAlign: 'center',
   },
 });
